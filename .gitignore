@@ -1,5 +1,7 @@
 .gradle/
 .kotlin/
+.cxx/
+.externalNativeBuild/
 .idea/
 **/build/
 local.properties
@@ -9,3 +11,4 @@ local.properties
 .codex/
 .codex-remote-attachments/
 captures/
+*.log
