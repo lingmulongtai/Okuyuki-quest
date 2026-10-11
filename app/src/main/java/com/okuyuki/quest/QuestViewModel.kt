@@ -34,18 +34,20 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
     private var prefetch: Job? = null
     private var lastEndpoint: Endpoint? = null
     private var cleanup: Job? = null
+    private val drain = SessionDrain(viewModelScope)
     private fun newSession() = CoroutineScope(SupervisorJob(viewModelScope.coroutineContext[Job]) + Dispatchers.Main.immediate)
 
     fun start() { discovery.start() }
     fun connect(endpoint: Endpoint) {
         disconnect()
+        val ready = cleanup
         lastEndpoint = endpoint
         session = newSession()
         val connection = QuestClient(endpoint, cache); client = connection
         _state.value = QuestState(message = "スマホとつないでいます…")
         session.launch {
             try {
-                cleanup?.join()
+                ready?.join()
                 val hello = withContext(Dispatchers.IO) { connection.hello() }
                 _state.update { it.copy(hello = hello) }
                 connection.token = store.token(hello.deviceId)
@@ -128,15 +130,15 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun backToLibrary() { opening?.cancel(); prefetch?.cancel(); _state.update { it.copy(current = null, eyes = null, opening = false, error = null) } }
     fun disconnect() {
+        val oldSession = session.coroutineContext[Job]
         val old = client; client = null
         old?.close(); session.cancel(); discovery.close()
+        cleanup = drain.after(oldSession)
         _state.value = QuestState(message = "スマホで「Questとつなぐ」をオンにしてください")
     }
     fun stop() {
-        val oldSession = session.coroutineContext[Job]
         disconnect()
-        cleanup = viewModelScope.launch(Dispatchers.IO) {
-            oldSession?.join()
+        cleanup = drain.after {
             decodeLock.withLock { runCatching { cache.clear() } }
         }
     }
