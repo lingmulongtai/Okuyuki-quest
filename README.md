@@ -16,3 +16,5 @@ WindowsではASCIIのパスにcloneまたはjunctionを作ってビルドして�
 元の仕様書に含まれる写真はこのリポジトリには公開しません。
 
 [署名付きAPKのReleases](https://github.com/lingmulongtai/Okuyuki-quest/releases) · [インストールと接続](docs/INSTALL.md) · [リリース内容](docs/RELEASE-NOTES.md)
+
+[検証記録](docs/VALIDATION.md)
