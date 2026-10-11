@@ -10,7 +10,7 @@ android {
     defaultConfig {
         applicationId = "com.okuyuki.quest"
         minSdk = 32
-        targetSdk = 32
+        targetSdk = 34
         versionCode = 1
         versionName = "0.1.0-alpha.1"
     }
