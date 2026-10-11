@@ -60,6 +60,10 @@ extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_okuyuki_stereo_StereoDecoder_decodeNative(JNIEnv* env, jobject, jstring path) {
     try {
         std::unique_ptr<heif_context, decltype(&heif_context_free)> context(heif_context_alloc(), heif_context_free);
+        auto* limits = heif_context_get_security_limits(context.get());
+        limits->max_image_size_pixels = 64000000ULL;
+        limits->max_memory_block_size = 256ULL * 1024 * 1024;
+        limits->max_total_memory = 256ULL * 1024 * 1024;
         const char* chars = env->GetStringUTFChars(path, nullptr);
         if (!chars) return nullptr;
         heif_error read = heif_context_read_from_file(context.get(), chars, nullptr);
