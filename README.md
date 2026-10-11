@@ -11,6 +11,8 @@ JDK 17、Android SDK 36。`./gradlew assembleDebug`（Windows: `gradlew.bat`）�
 WindowsではASCIIのパスにcloneまたはjunctionを作ってビルドしてください。
 
 ## Alpha status
-仕様書の「最初の版」を対象とする開発中のアルファです。[範囲と実機チェック](docs/ALPHA-SCOPE.md)。
+仕様書の「最初の版」を対象とするアルファです。[範囲と実機チェック](docs/ALPHA-SCOPE.md)。
 実機検証の完了を示すものではありません。v1.0の機能は上記の範囲と区別します。
 元の仕様書に含まれる写真はこのリポジトリには公開しません。
+
+[署名付きAPKのReleases](https://github.com/lingmulongtai/Okuyuki-quest/releases) · [インストールと接続](docs/INSTALL.md) · [リリース内容](docs/RELEASE-NOTES.md)
