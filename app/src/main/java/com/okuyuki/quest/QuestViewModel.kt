@@ -33,6 +33,7 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
     private var opening: Job? = null
     private var prefetch: Job? = null
     private var lastEndpoint: Endpoint? = null
+    private var cleanup: Job? = null
     private fun newSession() = CoroutineScope(SupervisorJob(viewModelScope.coroutineContext[Job]) + Dispatchers.Main.immediate)
 
     fun start() { discovery.start() }
@@ -44,6 +45,7 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = QuestState(message = "スマホとつないでいます…")
         session.launch {
             try {
+                cleanup?.join()
                 val hello = withContext(Dispatchers.IO) { connection.hello() }
                 _state.update { it.copy(hello = hello) }
                 connection.token = store.token(hello.deviceId)
@@ -131,8 +133,12 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = QuestState(message = "スマホで「Questとつなぐ」をオンにしてください")
     }
     fun stop() {
+        val oldSession = session.coroutineContext[Job]
         disconnect()
-        viewModelScope.launch(Dispatchers.IO) { decodeLock.withLock { runCatching { cache.clear() } } }
+        cleanup = viewModelScope.launch(Dispatchers.IO) {
+            oldSession?.join()
+            decodeLock.withLock { runCatching { cache.clear() } }
+        }
     }
     override fun onCleared() { disconnect(); runCatching { cache.clear() }; super.onCleared() }
 }
