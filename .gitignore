@@ -1,0 +1,16 @@
+.gradle/
+.kotlin/
+.cxx/
+.externalNativeBuild/
+.idea/
+**/build/
+local.properties
+*.jks
+*.keystore
+.env*
+.codex/
+.codex-remote-attachments/
+captures/
+*.log
+__pycache__/
+*.pyc
