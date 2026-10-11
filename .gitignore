@@ -12,3 +12,5 @@ local.properties
 .codex-remote-attachments/
 captures/
 *.log
+__pycache__/
+*.pyc
