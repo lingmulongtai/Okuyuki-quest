@@ -10,6 +10,15 @@ class TemporaryPhotoCache(val directory: File, val limitBytes: Long = 1024L * 10
     @Synchronized fun usage() = directory.listFiles()?.filter { it.isFile }?.sumOf { it.length() } ?: 0
     @Synchronized fun get(key: String): File? = File(directory, name(key)).takeIf { it.isFile }?.also { it.setLastModified(System.currentTimeMillis()) }
     @Synchronized fun partial(key: String): File = File(directory, "${name(key)}.part")
+    @Synchronized fun reserve(key: String, expectedBytes: Long) {
+        require(expectedBytes in 1..limitBytes)
+        val active = partial(key)
+        val additional = (expectedBytes - active.length()).coerceAtLeast(0)
+        directory.listFiles()?.filter { it.isFile && it != active }?.sortedBy { it.lastModified() }?.forEach {
+            if (usage() + additional > limitBytes) check(it.delete())
+        }
+        check(usage() + additional <= limitBytes) { "Temporary storage is full" }
+    }
     @Synchronized fun commit(key: String, expectedBytes: Long): File {
         val partial = partial(key)
         require(expectedBytes in 1..limitBytes && partial.length() == expectedBytes) { "Incomplete or oversized photo" }

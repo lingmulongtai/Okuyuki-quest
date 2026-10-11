@@ -13,6 +13,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -40,7 +42,7 @@ class QuestClient(val endpoint: Endpoint, private val cache: TemporaryPhotoCache
         check(it.isSuccessful) { if (it.code == 401) "スマホで接続を許可してください" else "スマホからの応答: ${it.code}" }
         val body = it.body ?: error("応答が空です")
         require(body.contentLength() <= 2 * 1024 * 1024) { "一覧が大きすぎます" }
-        Protocol.json.decodeFromString(body.string().also { text -> require(text.length <= 2 * 1024 * 1024) })
+        Protocol.json.decodeFromString(readBounded(body.byteStream(), 2 * 1024 * 1024).toString(Charsets.UTF_8))
     }
     suspend fun hello(): Hello = json<Hello>(request("/v1/hello").build()).also { require(it.protocolVersion == Protocol.VERSION) { "両アプリを同じバージョンに更新してください" } }
     suspend fun pair(input: PairRequest): PairResponse = json(request("/v1/pair").post(Protocol.json.encodeToString(input).toRequestBody("application/json".toMediaType())).build())
@@ -52,16 +54,14 @@ class QuestClient(val endpoint: Endpoint, private val cache: TemporaryPhotoCache
         check(it.isSuccessful) { "サムネイルを取得できませんでした" }
         val body = it.body ?: error("画像が空です")
         require(body.contentLength() <= 2 * 1024 * 1024)
-        body.byteStream().use { input ->
-            val bytes = input.readNBytes(2 * 1024 * 1024 + 1)
-            require(bytes.size <= 2 * 1024 * 1024); bytes
-        }
+        body.byteStream().use { input -> readBounded(input, 2 * 1024 * 1024) }
     }
     suspend fun original(hostId: String, photo: Photo): File = downloads.withLock {
         withContext(Dispatchers.IO) {
             require(photo.sizeBytes in 1..minOf(Protocol.MAX_ORIGINAL_BYTES, cache.limitBytes)) { "写真が大きすぎます" }
             val key = "$hostId:${photo.id}:${photo.takenAt}:${photo.sizeBytes}"
             cache.get(key)?.takeIf { it.length() == photo.sizeBytes }?.let { return@withContext it }
+            cache.reserve(key, photo.sizeBytes)
             val partial = cache.partial(key)
             var offset = partial.length().takeIf { it < photo.sizeBytes } ?: 0L
             val request = request("/v1/items/${safeId(photo.id)}/original").apply { if (offset > 0) header("Range", "bytes=$offset-") }.build()
@@ -103,4 +103,15 @@ class QuestClient(val endpoint: Endpoint, private val cache: TemporaryPhotoCache
     fun viewing(id: String) { socket?.send(Protocol.json.encodeToString(Event("viewing", id))) }
     override fun close() { heartbeat?.cancel(); socket?.cancel(); socket = null; http.dispatcher.cancelAll(); http.connectionPool.evictAll() }
     private fun safeId(id: String): String { require(id.matches(Regex("\\d{1,20}"))); return id }
+    private fun readBounded(input: InputStream, limit: Int): ByteArray {
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(8192)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            require(output.size() + count <= limit) { "応答が大きすぎます" }
+            output.write(buffer, 0, count)
+        }
+        return output.toByteArray()
+    }
 }

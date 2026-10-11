@@ -21,7 +21,14 @@ class TemporaryPhotoCacheTest {
     }
     @Test fun `photo keys cannot escape the app directory`() {
         val cache = TemporaryPhotoCache(folder.newFolder())
-        assertEquals(cache.directory.canonicalFile, cache.partial("../../private").parentFile.canonicalFile)
+        assertEquals(cache.directory.canonicalFile, cache.partial("../../private").parentFile!!.canonicalFile)
+    }
+    @Test fun `space is reserved before incoming bytes can exceed the cap`() {
+        val cache = TemporaryPhotoCache(folder.newFolder(), 16)
+        cache.partial("old").writeBytes(ByteArray(10)); cache.commit("old", 10)
+        cache.reserve("new", 10)
+        assertNull(cache.get("old")); assertEquals(0L, cache.usage())
+        assertTrue(runCatching { cache.reserve("huge", 17) }.isFailure)
     }
     @Test fun `manual addresses accept only local network endpoints`() {
         assertEquals(Endpoint("192.168.1.2", 1234), Endpoint.parse("http://192.168.1.2:1234"))
