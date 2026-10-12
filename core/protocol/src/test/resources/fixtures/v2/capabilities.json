@@ -1,0 +1,13 @@
+{
+  "screen": {
+    "graphicsWidth": 1920,
+    "graphicsHeight": 1080,
+    "videoWidth": 3840,
+    "videoHeight": 2160
+  },
+  "video": ["hevc-main10", "hevc-main", "h264-high", "av1-main10", "vp9-profile2", "vp9"],
+  "hdr": ["hdr10", "hlg"],
+  "image": ["jpeg", "png", "webp", "avif"],
+  "model": "OLED65C5PJA",
+  "platformVersion": "25.0.0"
+}

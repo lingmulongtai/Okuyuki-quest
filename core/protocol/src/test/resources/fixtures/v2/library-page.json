@@ -1,0 +1,45 @@
+{
+  "items": [
+    {
+      "id": "1000123",
+      "kind": "photo",
+      "name": "20261011_183012.jpg",
+      "takenAt": 1791713412000,
+      "width": 4080,
+      "height": 3060,
+      "sizeBytes": 4823112,
+      "mime": "image/jpeg",
+      "durationMs": null,
+      "stereo": false,
+      "hdr": "ultrahdr"
+    },
+    {
+      "id": "1000122",
+      "kind": "video",
+      "name": "20261011_175544.mp4",
+      "takenAt": 1791711344000,
+      "width": 3840,
+      "height": 2160,
+      "sizeBytes": 412339201,
+      "mime": "video/mp4",
+      "durationMs": 61233,
+      "stereo": false,
+      "hdr": "hdr10plus"
+    },
+    {
+      "id": "1000118",
+      "kind": "photo",
+      "name": "20261010_120501.heic",
+      "takenAt": 1791605101000,
+      "width": 4000,
+      "height": 3000,
+      "sizeBytes": 6233104,
+      "mime": "image/heic",
+      "durationMs": null,
+      "stereo": true,
+      "hdr": "none"
+    }
+  ],
+  "next": "MTc5MTYwNTEwMTAwMDoxMDAwMTE4",
+  "total": 1532
+}
