@@ -12,7 +12,7 @@ Android スマホとQuestの両方に、同じ `0.1.0-alpha.1` をインスト�
 - Questの停止時と次の起動時に写真の一時保存を削除。
 
 ## インストールと接続
-[インストール手順](https://github.com/lingmulongtai/Okuyuki-quest/blob/v0.1.0-alpha.1/docs/INSTALL.md)をご覧ください。
+[GalaxyとQuest 3Sの詳しい導入手順](https://github.com/lingmulongtai/Okuyuki-quest/blob/e5a62f6e597e86c88f6461549e3146be6fe0fc5c/docs/INSTALL.md)をご覧ください。
 Android側はAndroid 16以降、Quest側はQuest 3／3Sが対象です。Questの立体表示にはMeta VR OS SDK 207以降が必要です。
 
 ## 検証と制限
