@@ -7,26 +7,41 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.viewinterop.AndroidView
 import com.okuyuki.stereo.StereoPair
 import metavr.view.SurfaceControlExt
 import metavr.view.SurfaceViewExt
 
+/** Whether this OS composes a side-by-side surface in stereo inside a window: Meta VR OS SDK 207 and later. */
+val stereoSupported: Boolean by lazy {
+    try { metavr.os.Build.Version.getApiVersion() >= 207 } catch (_: LinkageError) { false } catch (_: RuntimeException) { false }
+}
+
+/** [eyes] in a window, in stereo where the OS allows it. [onMode] hears whether stereo composition took effect. */
+@Composable
+fun StereoSurface(eyes: StereoPair, modifier: Modifier, onMode: (Boolean) -> Unit) {
+    AndroidView(factory = { context -> StereoPhotoView(context).also { it.onModeChanged = onMode } },
+        update = { it.onModeChanged = onMode; it.eyes = eyes }, modifier = modifier, onRelease = { it.eyes = null })
+}
+
 class StereoPhotoView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
     var eyes: StereoPair? = null
         set(value) {
+            if (value === field) return
             field = value
             if (value == null) holder.setSizeFromLayout()
             else holder.setFixedSize(value.left.width * if (configured) 2 else 1, value.left.height)
             drawPhoto()
         }
     var onModeChanged: (Boolean) -> Unit = {}
-    val stereoAvailable: Boolean = try { metavr.os.Build.Version.getApiVersion() >= 207 } catch (_: LinkageError) { false } catch (_: RuntimeException) { false }
     private var configured = false
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
     init { holder.addCallback(this) }
     private fun configure() {
-        configured = if (stereoAvailable) try {
+        configured = if (stereoSupported) try {
             SurfaceViewExt.setStereoComposition(this, SurfaceControlExt.STEREO_COMPOSITION_SIDE_BY_SIDE); true
         } catch (_: LinkageError) { false } catch (_: RuntimeException) { false } else false
         onModeChanged(configured)

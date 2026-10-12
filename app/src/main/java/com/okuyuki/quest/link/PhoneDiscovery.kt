@@ -23,7 +23,7 @@ class PhoneDiscovery(context: Context) : AutoCloseable {
     private val listener = object : NsdManager.DiscoveryListener {
         override fun onDiscoveryStarted(type: String) = Unit
         override fun onDiscoveryStopped(type: String) = Unit
-        override fun onStartDiscoveryFailed(type: String, code: Int) { _error.value = "自動検出できません。スマホのアドレスを入力してください"; close() }
+        override fun onStartDiscoveryFailed(type: String, code: Int) { _error.value = "この Wi-Fi ではスマホを自動で見つけられません。下の「アドレスを入力してつなぐ」からつないでください。"; close() }
         override fun onStopDiscoveryFailed(type: String, code: Int) = Unit
         override fun onServiceFound(info: NsdServiceInfo) { synchronized(resolving) { resolving.add(info); resolveNext() } }
         override fun onServiceLost(info: NsdServiceInfo) { _phones.value = _phones.value.filter { it.name != info.serviceName } }
@@ -32,7 +32,7 @@ class PhoneDiscovery(context: Context) : AutoCloseable {
         if (active) return
         _error.value = null; _phones.value = emptyList(); active = true
         try { lock.acquire(); nsd.discoverServices(Protocol.SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, listener) }
-        catch (_: Exception) { _error.value = "自動検出できません。スマホのアドレスを入力してください"; close() }
+        catch (_: Exception) { _error.value = "この Wi-Fi ではスマホを自動で見つけられません。下の「アドレスを入力してつなぐ」からつないでください。"; close() }
     }
     @Suppress("DEPRECATION") private fun resolveNext() {
         if (busy || !active || resolving.isEmpty()) return

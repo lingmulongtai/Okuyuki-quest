@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The in-app mark (BrandMark) on the center 46dp: two squares overlapping in depth, the shared part in the background color. Kept inside the 66dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#2747E6" android:pathData="M35.71,31H55.73A4.71,4.71 0,0 1,60.44 35.71V55.73A4.71,4.71 0,0 1,55.73 60.44H35.71A4.71,4.71 0,0 1,31 55.73V35.71A4.71,4.71 0,0 1,35.71 31Z"/>
+    <path android:fillColor="#E8603F" android:pathData="M52.27,47.56H72.29A4.71,4.71 0,0 1,77 52.27V72.29A4.71,4.71 0,0 1,72.29 77H52.27A4.71,4.71 0,0 1,47.56 72.29V52.27A4.71,4.71 0,0 1,52.27 47.56Z"/>
+    <path android:fillColor="#141821" android:pathData="M52.27,47.56H60.44V55.73A4.71,4.71 0,0 1,55.73 60.44H47.56V52.27A4.71,4.71 0,0 1,52.27 47.56Z"/>
+</vector>

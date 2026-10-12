@@ -4,7 +4,8 @@ import java.io.File
 import java.security.MessageDigest
 
 /** Only this dedicated app-private directory is managed. It is wiped at session start and end. */
-class TemporaryPhotoCache(val directory: File, val limitBytes: Long = 1024L * 1024 * 1024) {
+class TemporaryPhotoCache(val directory: File, val limitBytes: Long = LIMIT_BYTES) {
+    companion object { const val LIMIT_BYTES = 1024L * 1024 * 1024 }
     init { require(limitBytes > 0); directory.mkdirs(); clear() }
     @Synchronized fun clear() { directory.listFiles()?.filter { it.isFile }?.forEach { check(it.delete()) } }
     @Synchronized fun usage() = directory.listFiles()?.filter { it.isFile }?.sumOf { it.length() } ?: 0
