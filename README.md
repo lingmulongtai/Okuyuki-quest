@@ -17,8 +17,8 @@ Project: https://github.com/users/lingmulongtai/projects/2
 
 1. **Galaxy**: Android版APKを開き、インストール元の許可を与えて入れます。Okuyukiの写真アクセスを許可し、ライブラリに試したい3D写真があることを確認します。
 2. **Quest**: Meta Horizonアプリで開発者モードをオンにし、PCとUSB接続してQuest内のUSBデバッグを許可します。PCからADBでQuest版APKを入れ、アプリライブラリーの「提供元不明」から **Okuyuki Quest** を開きます。
-3. **接続**: 両端末を同じWi-Fiに接続します。Galaxyの「Quest」タブで **「Questとつなぐ」をオン** にし、Questでスマホを選びます。見つからない場合はGalaxyの **IPアドレス:ポート** をQuestに入力します。
-4. **承認と閲覧**: 両画面の4桁の番号が同じことを確認し、Galaxyで「許可」を押します。Questの一覧から写真を選びます。終了時はQuestアプリを閉じ、Galaxyの待機をオフにします。
+3. **接続**: 両端末を同じWi-Fiに接続します。Galaxyの「つなぐ」タブで **「接続を待つ」をオン** にし、Questの「近くのスマホ」でGalaxyを選びます。見つからない場合はGalaxyに出ている **アドレス** をQuestに入力します。
+4. **承認と閲覧**: 両画面の4桁の番号が同じことを確認し、Galaxyで「許可する」を押します。Questの一覧から写真を選びます。次回からはQuestでアプリを開くだけでつながります。終了時はQuestアプリを閉じ、Galaxyの「接続を待つ」をオフにします。
 
 **[初回の設定から詳しく読む → インストール・接続ガイド](docs/INSTALL.md)**
 
