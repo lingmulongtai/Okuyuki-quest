@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Two squares overlapping in depth; the shared part shows the ink background. Kept inside the 66dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#2747E6" android:pathData="M36.4,31H59.6A5.4,5.4 0,0 1,65 36.4V59.6A5.4,5.4 0,0 1,59.6 65H36.4A5.4,5.4 0,0 1,31 59.6V36.4A5.4,5.4 0,0 1,36.4 31Z"/>
+    <path android:fillColor="#E8603F" android:pathData="M48.4,43H71.6A5.4,5.4 0,0 1,77 48.4V71.6A5.4,5.4 0,0 1,71.6 77H48.4A5.4,5.4 0,0 1,43 71.6V48.4A5.4,5.4 0,0 1,48.4 43Z"/>
+    <path android:fillColor="#141821" android:pathData="M48.4,43H65V59.6A5.4,5.4 0,0 1,59.6 65H43V48.4A5.4,5.4 0,0 1,48.4 43Z"/>
+</vector>

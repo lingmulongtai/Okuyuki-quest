@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches the Compose background, so the panel shows no flash of another color while the app starts. -->
+    <style name="Theme.Okuyuki" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window</item>
+        <item name="android:windowSplashScreenBackground">@color/window</item>
+    </style>
+</resources>
