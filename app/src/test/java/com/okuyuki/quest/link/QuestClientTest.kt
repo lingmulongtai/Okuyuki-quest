@@ -1,5 +1,8 @@
 package com.okuyuki.quest.link
 
+import com.okuyuki.protocol.OsmoMotionCodec
+import com.okuyuki.protocol.OsmoMotionFrame
+import com.okuyuki.protocol.OsmoMotionTrack
 import com.okuyuki.protocol.Photo
 import com.okuyuki.protocol.PanoramaPhotoShare
 import com.okuyuki.protocol.PanoramaVideoShare
@@ -110,6 +113,46 @@ class QuestClientTest {
                 val request = server.takeRequest()
                 assertEquals("/v3/panorama/video", request.path)
                 assertEquals("Bearer paired-token", request.getHeader("Authorization"))
+            }
+        }
+    }
+    @Test fun `motion download is bounded authenticated and backward compatible`() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            val share = PanoramaVideoShare("0123456789abcdef0123456789abcdef", 10, PanoramaVideoFormat.OSMO_OSV)
+            val motion = OsmoMotionTrack(listOf(OsmoMotionFrame(0, listOf(0f, 0f, 0f, 1f))), 20000)
+            val encoded = OsmoMotionCodec.encode(motion)
+            server.enqueue(MockResponse().setResponseCode(404))
+            server.enqueue(MockResponse().setBody(Buffer().write(encoded)))
+            server.enqueue(MockResponse().setBody(Buffer().write(encoded.copyOf(encoded.size - 1))))
+            server.enqueue(MockResponse().setHeader("Content-Length", OsmoMotionCodec.MAX_BYTES + 1))
+            server.enqueue(MockResponse().setResponseCode(401))
+            server.enqueue(MockResponse().setResponseCode(302).setHeader("Location", server.url("/leak")))
+            QuestClient(Endpoint(server.hostName, server.port), TemporaryPhotoCache(folder.newFolder())).use { client ->
+                client.token = "paired-token"
+                assertNull(client.panoramaVideoMotion(share))
+                assertEquals(motion, client.panoramaVideoMotion(share))
+                repeat(4) { assertTrue(runCatching { client.panoramaVideoMotion(share) }.isFailure) }
+                repeat(6) {
+                    val request = server.takeRequest()
+                    assertEquals("/v3/panorama/video/${share.id}/motion", request.path)
+                    assertEquals("Bearer paired-token", request.getHeader("Authorization"))
+                }
+                assertTrue(runCatching { client.panoramaVideoMotion(share.copy(id = "../1")) }.isFailure)
+                assertEquals(6, server.requestCount)
+            }
+        }
+    }
+    @Test fun `motion download can be cancelled while the body is stalled`() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            val share = PanoramaVideoShare("0123456789abcdef0123456789abcdef", 10, PanoramaVideoFormat.OSMO_LRF)
+            val motion = OsmoMotionCodec.encode(OsmoMotionTrack(listOf(OsmoMotionFrame(0, listOf(0f, 0f, 0f, 1f))), 40000))
+            server.enqueue(MockResponse().setBody(Buffer().write(motion)).setBodyDelay(5, java.util.concurrent.TimeUnit.SECONDS))
+            QuestClient(Endpoint(server.hostName, server.port), TemporaryPhotoCache(folder.newFolder())).use { client ->
+                val task = launch { client.panoramaVideoMotion(share) }
+                delay(200); withTimeout(2000) { task.cancelAndJoin() }
+                assertTrue(task.isCancelled)
             }
         }
     }

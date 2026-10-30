@@ -94,6 +94,17 @@ class QuestClient(val endpoint: Endpoint, private val cache: TemporaryPhotoCache
             require(it.format == PanoramaVideoFormat.EQUIRECTANGULAR_MP4)
         } else share
     }
+    /** Motion data is optional on older hosts and is bound to the selected video ID. */
+    suspend fun panoramaVideoMotion(share: PanoramaVideoShare): OsmoMotionTrack? {
+        require(share.isValid() && share.format != PanoramaVideoFormat.EQUIRECTANGULAR_MP4)
+        return readResponse(request("/v3/panorama/video/${share.id}/motion").build()) { response ->
+            if (response.code == 204 || response.code == 404) return@readResponse null
+            check(response.code == 200) { "動画の姿勢情報を取得できませんでした (${response.code})" }
+            val body = response.body ?: error("姿勢情報が空です")
+            require(body.contentLength() in -1..OsmoMotionCodec.MAX_BYTES.toLong()) { "姿勢情報が大きすぎます" }
+            OsmoMotionCodec.decode(readBounded(body.byteStream(), OsmoMotionCodec.MAX_BYTES))
+        }
+    }
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     fun panoramaVideoSource(share: PanoramaVideoShare): androidx.media3.exoplayer.source.MediaSource {
         require(share.isValid())
