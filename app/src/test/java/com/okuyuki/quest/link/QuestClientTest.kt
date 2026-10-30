@@ -148,7 +148,8 @@ class QuestClientTest {
             server.start()
             val share = PanoramaVideoShare("0123456789abcdef0123456789abcdef", 10, PanoramaVideoFormat.OSMO_LRF)
             val motion = OsmoMotionCodec.encode(OsmoMotionTrack(listOf(OsmoMotionFrame(0, listOf(0f, 0f, 0f, 1f))), 40000))
-            server.enqueue(MockResponse().setBody(Buffer().write(motion)).setBodyDelay(5, java.util.concurrent.TimeUnit.SECONDS))
+            // Keep the response stalled past the cancellation timeout, but below MockWebServer's shutdown deadline.
+            server.enqueue(MockResponse().setBody(Buffer().write(motion)).setBodyDelay(3, java.util.concurrent.TimeUnit.SECONDS))
             QuestClient(Endpoint(server.hostName, server.port), TemporaryPhotoCache(folder.newFolder())).use { client ->
                 val task = launch { client.panoramaVideoMotion(share) }
                 delay(200); withTimeout(2000) { task.cancelAndJoin() }
