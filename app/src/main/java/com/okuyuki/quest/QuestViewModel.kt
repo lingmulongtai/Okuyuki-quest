@@ -22,7 +22,8 @@ data class QuestState(
     val panoramaBytes: ByteArray? = null, val openingPanorama: Boolean = false,
     val sharedVideo: PanoramaVideoShare? = null, val viewingVideo: Boolean = false,
     val videoMotion: OsmoStabilization? = null, val videoMotionLoading: Boolean = false,
-    val videoStabilizationEnabled: Boolean = false,
+    val videoStabilizationEnabled: Boolean = false, val videoStabilizationUnavailable: Boolean = false,
+    val videoGeneration: Long = 0L,
     val message: String = "スマホを探しています", val error: String? = null, val cacheBytes: Long = 0,
 )
 
@@ -42,6 +43,7 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
     private var panoramaPoll: Job? = null
     private var videoRefresh: Job? = null
     private var videoMotionJob: Job? = null
+    private var videoGeneration = 0L
     private var videoRefreshRequested = false
     private var panoramaRefreshRequested = false
     private var lastEndpoint: Endpoint? = null
@@ -170,9 +172,11 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         if (!state.connected) return
         opening?.cancel(); prefetch?.cancel(); panoramaOpening?.cancel(); videoMotionJob?.cancel()
         val raw = share.format != PanoramaVideoFormat.EQUIRECTANGULAR_MP4
+        val generation = ++videoGeneration
         _state.update { it.copy(current = null, eyes = null, viewingPanorama = false, panoramaBytes = null,
             openingPanorama = false, viewingVideo = true, videoMotion = null,
-            videoMotionLoading = raw, videoStabilizationEnabled = false, error = null) }
+            videoMotionLoading = raw, videoStabilizationEnabled = false, videoStabilizationUnavailable = false,
+            videoGeneration = generation, error = null) }
         if (!raw) return
         videoMotionJob = session.launch {
             try {
@@ -180,20 +184,29 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
                 val correction = track?.let { withContext(Dispatchers.Default) { OsmoStabilization(it) } }
                 if (client !== connection) return@launch
                 _state.update { current ->
-                    if (!current.connected || !current.viewingVideo || current.sharedVideo != share) current
+                    if (!current.connected || !current.viewingVideo || current.sharedVideo != share || current.videoGeneration != generation) current
                     else current.copy(videoMotion = correction, videoMotionLoading = false)
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) {
                 if (client === connection) _state.update { current ->
-                    if (!current.connected || !current.viewingVideo || current.sharedVideo != share) current
+                    if (!current.connected || !current.viewingVideo || current.sharedVideo != share || current.videoGeneration != generation) current
                     else current.copy(videoMotion = null, videoMotionLoading = false)
                 }
             }
         }
     }
-    fun setVideoStabilization(enabled: Boolean) {
-        _state.update { state -> state.copy(videoStabilizationEnabled = enabled && state.videoMotion != null && state.viewingVideo) }
+    fun setVideoStabilization(enabled: Boolean, shareId: String, generation: Long) {
+        _state.update { state ->
+            if (!state.viewingVideo || state.sharedVideo?.id != shareId || state.videoGeneration != generation) state
+            else state.copy(videoStabilizationEnabled = enabled && state.videoMotion != null, videoStabilizationUnavailable = false)
+        }
+    }
+    fun videoStabilizationUnavailable(shareId: String, generation: Long) {
+        _state.update { state ->
+            if (!state.viewingVideo || state.sharedVideo?.id != shareId || state.videoGeneration != generation) state
+            else state.copy(videoStabilizationEnabled = false, videoStabilizationUnavailable = true)
+        }
     }
     fun prepareImmersiveVideo(): Boolean {
         val current = _state.value

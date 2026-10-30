@@ -77,6 +77,13 @@ fun QuestApp(model: QuestViewModel) {
                             LinearProgressIndicator(Modifier.fillMaxWidth())
                             Text("スマホから姿勢情報を確認しています…")
                         }
+                        if (share?.format == PanoramaVideoFormat.OSMO_LRF && !state.videoMotionLoading && state.videoMotion != null) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = state.videoStabilizationEnabled, onCheckedChange = { model.setVideoStabilization(it, share.id, state.videoGeneration) })
+                                Text("手ぶれ補正（実験的）")
+                            }
+                            if (state.videoStabilizationUnavailable) Text("映像フレームと姿勢を照合できないため、補正をオフにしました。")
+                        }
                         if (share != null && !state.videoMotionLoading) {
                             OutlinedButton(onClick = {
                                 if (model.prepareImmersiveVideo()) {
@@ -95,7 +102,8 @@ fun QuestApp(model: QuestViewModel) {
                         }
                         val sources = remember(share) { listOfNotNull(model.videoSource(), model.videoSource()) }
                         if (!state.videoMotionLoading && sources.size == 2) when (share?.format) {
-                            PanoramaVideoFormat.OSMO_LRF -> QuestOsmoProxy(sources[0], share.calibration, Modifier.weight(1f).fillMaxWidth())
+                            PanoramaVideoFormat.OSMO_LRF -> QuestOsmoProxy(sources[0], share.calibration, state.videoMotion, state.videoStabilizationEnabled,
+                                { model.videoStabilizationUnavailable(share.id, state.videoGeneration) }, Modifier.weight(1f).fillMaxWidth())
                             PanoramaVideoFormat.OSMO_OSV -> QuestOsmoVideo(sources, share.calibration, Modifier.weight(1f).fillMaxWidth())
                             else -> QuestPanoramaVideo(sources[0], Modifier.weight(1f).fillMaxWidth())
                         }
