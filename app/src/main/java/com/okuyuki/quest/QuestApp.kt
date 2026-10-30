@@ -1,6 +1,9 @@
 package com.okuyuki.quest
 
 import android.graphics.Bitmap
+import android.app.Activity
+import android.content.Intent
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -10,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -27,6 +31,7 @@ import java.util.Locale
 
 @Composable
 fun QuestApp(model: QuestViewModel) {
+    val context = LocalContext.current
     val state by model.state.collectAsStateWithLifecycle()
     val nearby by model.discovery.phones.collectAsStateWithLifecycle()
     val discoveryError by model.discovery.error.collectAsStateWithLifecycle()
@@ -68,6 +73,22 @@ fun QuestApp(model: QuestViewModel) {
                         TextButton(onClick = model::closeVideo) { Text("一覧に戻る") }
                         Text("360°動画 · ウィンドウ内プレビュー")
                         val share = state.sharedVideo
+                        if (share?.format == PanoramaVideoFormat.EQUIRECTANGULAR_MP4) {
+                            OutlinedButton(onClick = {
+                                if (model.prepareImmersiveVideo()) {
+                                    try {
+                                        context.startActivity(Intent(context, ImmersiveActivity::class.java).apply {
+                                            action = Intent.ACTION_MAIN
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        })
+                                        (context as? Activity)?.finishAndRemoveTask()
+                                    } catch (_: Exception) {
+                                        ImmersivePlayback.cancel()
+                                        Toast.makeText(context, "没入画面を開けませんでした", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            }) { Text("没入表示を試す（実験的）") }
+                        }
                         val sources = remember(share) { listOfNotNull(model.videoSource(), model.videoSource()) }
                         if (sources.size == 2) when (share?.format) {
                             PanoramaVideoFormat.OSMO_LRF -> QuestOsmoProxy(sources[0], Modifier.weight(1f).fillMaxWidth())

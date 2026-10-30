@@ -158,6 +158,16 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         _state.update { it.copy(current = null, eyes = null, viewingPanorama = false, panoramaBytes = null,
             openingPanorama = false, viewingVideo = true, error = null) }
     }
+    fun prepareImmersiveVideo(): Boolean {
+        val current = _state.value
+        val share = current.sharedVideo ?: return false
+        val existing = client ?: return false
+        val token = existing.token ?: return false
+        if (!current.connected || !current.viewingVideo || share.format != PanoramaVideoFormat.EQUIRECTANGULAR_MP4) return false
+        val connection = QuestClient(existing.endpoint, cache).apply { this.token = token }
+        ImmersivePlayback.install(ImmersivePlayback.Connection(connection, share))
+        return true
+    }
     fun closeVideo() { _state.update { it.copy(viewingVideo = false) } }
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     fun videoSource(): androidx.media3.exoplayer.source.MediaSource? {

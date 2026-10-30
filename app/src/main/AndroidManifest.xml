@@ -1,4 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:metavr="http://schemas.meta.com/metavr-sdk">
+<uses-feature android:name="android.hardware.vr.headtracking" android:required="false"/>
 <uses-permission android:name="android.permission.INTERNET"/>
 <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
@@ -6,10 +7,18 @@
 <metavr:uses-metavr-sdk metavr:minSdkVersion="207" metavr:targetSdkVersion="207"/>
 <application android:label="Okuyuki Quest" android:icon="@drawable/ic_launcher"
     android:allowBackup="false" android:supportsRtl="true" android:usesCleartextTraffic="true" android:theme="@android:style/Theme.Material.NoActionBar">
+    <uses-native-library android:name="libossdk.oculus.so" android:required="false"/>
+    <meta-data android:name="com.oculus.vr.focusaware" android:value="true"/>
     <meta-data android:name="com.oculus.supportedDevices" android:value="quest3|quest3s"/>
     <activity android:name=".MainActivity" android:exported="true" android:resizeableActivity="true">
         <layout android:defaultWidth="1000dp" android:defaultHeight="650dp" android:minWidth="480dp" android:minHeight="360dp"/>
-        <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+        <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/><category android:name="com.oculus.intent.category.2D"/></intent-filter>
+    </activity>
+    <activity android:name=".ImmersiveActivity" android:exported="false"
+        android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+        android:taskAffinity="com.okuyuki.quest.immersive"
+        android:configChanges="screenSize|screenLayout|orientation|keyboardHidden|keyboard|navigation|uiMode">
+        <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.DEFAULT"/><category android:name="com.oculus.intent.category.VR"/></intent-filter>
     </activity>
 </application>
 </manifest>
