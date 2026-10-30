@@ -47,6 +47,11 @@ jobs:
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk dist/Okuyuki-quest-${{ github.ref_name }}.apk
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs dist/*.apk > dist/signature.txt
+          grep -Fx 'Signer #1 certificate SHA-256 digest: b67d2d74d73b2649d35c2e81e9e8b547801cf69ab387c2b741f75d78da3abd31' dist/signature.txt
+          test "$(grep -c '^Signer #[0-9]* certificate SHA-256 digest:' dist/signature.txt)" = 1
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging dist/*.apk > dist/package.txt
+          grep -F "name='com.okuyuki.quest' versionCode='7' versionName='0.1.0-alpha.8-preview'" dist/package.txt
+          unzip -l dist/*.apk | grep -F 'lib/arm64-v8a/libokuyuki_projection.so'
           cp docs/RELEASE-NOTES.md dist/release-notes.md
           cp docs/VALIDATION.md dist/validation.md
           cp docs/third-party/* dist/
