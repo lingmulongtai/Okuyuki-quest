@@ -73,18 +73,22 @@ class OsmoStabilization(track: OsmoMotionTrack) {
     private val frames = track.frames
     private val packedFrames = frames as? PackedMotionFrames
     private fun timeAt(index: Int): Long = packedFrames?.timeAt(index) ?: frames[index].presentationTimeUs
+    private fun attitudeAt(index: Int): FloatArray = packedFrames?.let {
+        fromStored(it.componentAt(index, 0), it.componentAt(index, 1), it.componentAt(index, 2), it.componentAt(index, 3))
+    } ?: fromStored(frames[index].storedAttitude)
     private val tolerance = track.frameIntervalUs / 2
     private val corrections: FloatArray
     init {
         require(OsmoMotionCodec.isValid(track))
-        var previousTime = frames.first().presentationTimeUs
-        var target = fromStored(frames.first().storedAttitude)
+        var previousTime = timeAt(0)
+        var target = attitudeAt(0)
         corrections = FloatArray(frames.size * 4)
-        frames.forEachIndexed { index, frame ->
-            val current = fromStored(frame.storedAttitude)
-            val dt = (frame.presentationTimeUs - previousTime).coerceAtLeast(0L).toDouble() / 1000000.0
+        for (index in frames.indices) {
+            val current = attitudeAt(index)
+            val time = timeAt(index)
+            val dt = (time - previousTime).coerceAtLeast(0L).toDouble() / 1000000.0
             target = slerp(target, current, (1.0 - exp(-dt / 0.7)).toFloat())
-            previousTime = frame.presentationTimeUs
+            previousTime = time
             val correction = multiply(floatArrayOf(current[0], -current[1], -current[2], -current[3]), target)
             correction.copyInto(corrections, index * 4)
         }
@@ -103,8 +107,9 @@ class OsmoStabilization(track: OsmoMotionTrack) {
     companion object {
         internal fun fromStored(q: List<Float>): FloatArray {
             require(q.size == 4 && q.all { it.isFinite() })
-            return normalize(floatArrayOf(q[3], -q[1], q[2], q[0]))
+            return fromStored(q[0], q[1], q[2], q[3])
         }
+        private fun fromStored(a: Float, b: Float, c: Float, d: Float): FloatArray = normalize(floatArrayOf(d, -b, c, a))
         private fun normalize(q: FloatArray): FloatArray {
             val norm = sqrt(q.sumOf { (it * it).toDouble() }).toFloat()
             require(norm > 0f && norm.isFinite())
