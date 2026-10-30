@@ -9,7 +9,7 @@ object Protocol {
     const val PAGE_SIZE = 48
     const val MAX_ORIGINAL_BYTES = 256L * 1024 * 1024
     const val MAX_PANORAMA_PHOTO_BYTES = 64L * 1024 * 1024
-    const val MAX_PANORAMA_VIDEO_BYTES = 64L * 1024 * 1024 * 1024
+    const val MAX_PANORAMA_VIDEO_BYTES = 256L * 1024 * 1024 * 1024
     val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 }
 

@@ -22,6 +22,7 @@ class ProtocolTest {
         assertFalse(video.copy(id = "../video").isValid())
         assertFalse(video.copy(sizeBytes = 0).isValid())
         assertFalse(video.copy(sizeBytes = Protocol.MAX_PANORAMA_VIDEO_BYTES + 1).isValid())
+        assertTrue(video.copy(sizeBytes = 100L * 1024 * 1024 * 1024).isValid())
     }
     @Test fun `video format is explicit and old metadata remains readable`() {
         val old = Protocol.json.decodeFromString<PanoramaVideoShare>("""{"id":"0123456789abcdef0123456789abcdef","sizeBytes":10}""")
@@ -53,6 +54,10 @@ class ProtocolTest {
         assertEquals(ByteRange(0, 9), ByteRange.parse("bytes=-99", 10))
         assertEquals(ByteRange(2, 9), ByteRange.parse("bytes=2-99", 10))
         assertEquals(8L, ByteRange.parse("bytes=2-99", 10)!!.length)
+        val largeSize = 100L * 1024 * 1024 * 1024
+        val offset = 75L * 1024 * 1024 * 1024
+        assertEquals(ByteRange(offset, largeSize - 1), ByteRange.parse("bytes=$offset-", largeSize))
+        assertEquals(ByteRange(largeSize - 4096, largeSize - 1), ByteRange.parse("bytes=-4096", largeSize))
     }
 
     @Test fun `invalid intervals do not expose data`() {
