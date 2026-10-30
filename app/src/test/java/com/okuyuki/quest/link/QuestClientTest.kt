@@ -40,6 +40,35 @@ class QuestClientTest {
             }
         }
     }
+    @Test fun `a socket ended for a removed pairing is told apart from a lost phone`() = runBlocking {
+        fun upgrade(code: Int) = MockResponse().withWebSocketUpgrade(object : okhttp3.WebSocketListener() {
+            override fun onOpen(webSocket: okhttp3.WebSocket, response: okhttp3.Response) { webSocket.close(code, null) }
+        })
+        for ((response, revoked) in listOf(upgrade(1008) to true, upgrade(1001) to false, MockResponse().setResponseCode(401) to true)) {
+            MockWebServer().use { server ->
+                server.enqueue(response)
+                server.start()
+                val ended = kotlinx.coroutines.CompletableDeferred<Boolean>()
+                QuestClient(Endpoint(server.hostName, server.port), TemporaryPhotoCache(folder.newFolder())).use { client ->
+                    client.events(this, {}, { ended.complete(it) })
+                    assertEquals(revoked, withTimeout(2000) { ended.await() })
+                }
+            }
+        }
+    }
+    @Test fun `a refused saved permission is reported apart from other failures`() = runBlocking {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setResponseCode(401))
+            server.enqueue(MockResponse().setResponseCode(500))
+            server.start()
+            QuestClient(Endpoint(server.hostName, server.port), TemporaryPhotoCache(folder.newFolder())).use { client ->
+                client.token = "removed-token"
+                assertTrue(runCatching { client.library() }.exceptionOrNull() is NotAllowedException)
+                val other = runCatching { client.library() }.exceptionOrNull()
+                assertTrue(other != null && other !is NotAllowedException)
+            }
+        }
+    }
     @Test fun `cancel a panorama metadata request while the body is stalled`() = runBlocking {
         MockWebServer().use { server ->
             server.start()

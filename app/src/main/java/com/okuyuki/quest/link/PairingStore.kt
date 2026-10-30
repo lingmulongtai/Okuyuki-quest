@@ -27,7 +27,20 @@ class PairingStore(context: Context) {
         val value = Base64.encodeToString(cipher.iv, Base64.NO_WRAP) + ':' + Base64.encodeToString(cipher.doFinal(token.toByteArray()), Base64.NO_WRAP)
         preferences.edit().putString("token:$hostId", value).putString("lastHost", hostId).apply()
     }
-    fun forget(hostId: String) { preferences.edit().remove("token:$hostId").apply() }
+    fun paired(hostId: String) = preferences.contains("token:$hostId")
+    /** The phone this Quest last showed photos from and where it was, so opening the app can go straight back to it. */
+    fun last(): Pair<String, Endpoint>? {
+        val hostId = preferences.getString("lastHost", null)?.takeIf(::paired) ?: return null
+        return Endpoint.parse(preferences.getString("lastEndpoint", null) ?: return null)?.let { hostId to it }
+    }
+    fun remember(hostId: String, endpoint: Endpoint) {
+        preferences.edit().putString("lastHost", hostId).putString("lastEndpoint", "${endpoint.host}:${endpoint.port}").apply()
+    }
+    fun forget(hostId: String) {
+        val editor = preferences.edit().remove("token:$hostId")
+        if (preferences.getString("lastHost", null) == hostId) editor.remove("lastHost").remove("lastEndpoint")
+        editor.apply()
+    }
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         (store.getKey("okuyuki-pairing", null) as? SecretKey)?.let { return it }

@@ -19,9 +19,13 @@ import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+/** The phone no longer accepts this Quest's saved permission: it was removed on the phone. */
+class NotAllowedException : IllegalStateException("スマホで接続を許可してください")
+
 class QuestClient(val endpoint: Endpoint, private val cache: TemporaryPhotoCache) : AutoCloseable {
+    // The ping makes a phone that left the network end the event socket, instead of leaving it open and silent.
     private val http = OkHttpClient.Builder().connectTimeout(8, TimeUnit.SECONDS).readTimeout(40, TimeUnit.SECONDS)
-        .followRedirects(false).followSslRedirects(false).build()
+        .pingInterval(15, TimeUnit.SECONDS).followRedirects(false).followSslRedirects(false).build()
     private val downloads = Mutex()
     private val panoramaDownloads = Mutex()
     var token: String? = null
@@ -40,7 +44,8 @@ class QuestClient(val endpoint: Endpoint, private val cache: TemporaryPhotoCache
         })
     }
     private suspend inline fun <reified T> json(request: Request): T = execute(request).use {
-        check(it.isSuccessful) { if (it.code == 401) "スマホで接続を許可してください" else "スマホからの応答: ${it.code}" }
+        if (it.code == 401) throw NotAllowedException()
+        check(it.isSuccessful) { "スマホからの応答: ${it.code}" }
         val body = it.body ?: error("応答が空です")
         require(body.contentLength() <= 2 * 1024 * 1024) { "一覧が大きすぎます" }
         Protocol.json.decodeFromString(readBounded(body.byteStream(), 2 * 1024 * 1024).toString(Charsets.UTF_8))
@@ -174,21 +179,22 @@ class QuestClient(val endpoint: Endpoint, private val cache: TemporaryPhotoCache
             cache.commit(key, photo.sizeBytes)
         }
     }
-    fun events(scope: CoroutineScope, changed: () -> Unit, failed: () -> Unit) {
+    /** [failed] hears whether the phone ended the socket because this Quest's permission was removed (1008 or 401). */
+    fun events(scope: CoroutineScope, changed: () -> Unit, failed: (revoked: Boolean) -> Unit) {
         socket?.cancel(); heartbeat?.cancel()
         socket = http.newWebSocket(request("/v1/events").build(), object : WebSocketListener() {
             private val ended = java.util.concurrent.atomic.AtomicBoolean(false)
-            private fun notifyEnded() { if (ended.compareAndSet(false, true)) failed() }
+            private fun notifyEnded(revoked: Boolean = false) { if (ended.compareAndSet(false, true)) failed(revoked) }
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                notifyEnded()
+                notifyEnded(code == 1008)
                 webSocket.close(1000, null)
             }
             override fun onMessage(webSocket: WebSocket, text: String) {
                 val event = runCatching { Protocol.json.decodeFromString<Event>(text) }.getOrNull()
                 if (event?.type == "library_changed" || event?.type == "panorama_changed" || event?.type == "panorama_video_changed") changed()
             }
-            override fun onFailure(webSocket: WebSocket, error: Throwable, response: Response?) { notifyEnded() }
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { notifyEnded() }
+            override fun onFailure(webSocket: WebSocket, error: Throwable, response: Response?) { notifyEnded(response?.code == 401) }
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { notifyEnded(code == 1008) }
         })
         heartbeat = scope.launch { while (isActive) { delay(15_000); socket?.send(Protocol.json.encodeToString(Event("heartbeat"))) } }
     }
