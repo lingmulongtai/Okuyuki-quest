@@ -5,18 +5,25 @@ import kotlin.math.exp
 import kotlin.math.sin
 import kotlin.math.sqrt
 
+data class FrameTimestampToken(val releaseNs: Long, val presentationUs: Long?)
+
 /** Bounded exact mapping between MediaCodec release timestamps and media PTS. */
 class FrameTimestampMap(private val capacity: Int = 128) {
     private val timestamps = LinkedHashMap<Long, Long?>()
+    private var latestToken: FrameTimestampToken? = null
     init { require(capacity > 0) }
     @Synchronized fun record(releaseNs: Long, presentationUs: Long) {
-        if (releaseNs < 0 || presentationUs < 0) return
+        if (releaseNs < 0 || presentationUs < 0) {
+            latestToken = FrameTimestampToken(releaseNs, null); return
+        }
         timestamps[releaseNs] = if (timestamps.containsKey(releaseNs)) null else presentationUs
+        latestToken = FrameTimestampToken(releaseNs, timestamps[releaseNs])
         while (timestamps.size > capacity) timestamps.remove(timestamps.keys.first())
     }
     @Synchronized fun lookup(releaseNs: Long): Long? = timestamps[releaseNs]
     @Synchronized fun contains(releaseNs: Long): Boolean = timestamps.containsKey(releaseNs)
-    @Synchronized fun clear() = timestamps.clear()
+    @Synchronized fun latest(): FrameTimestampToken? = latestToken
+    @Synchronized fun clear() { timestamps.clear(); latestToken = null }
 }
 
 data class MatchedCorrection(val correction: FloatArray?, val waiting: Boolean)

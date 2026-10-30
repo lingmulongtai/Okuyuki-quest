@@ -12,6 +12,11 @@ class OsmoStabilizationTest {
         map.clear(); assertNull(map.lookup(300))
         map.record(-1, 4); map.record(1, -1); assertNull(map.lookup(1))
         map.record(400, 40); map.record(400, 50); assertNull(map.lookup(400))
+        assertEquals(FrameTimestampToken(400, null), map.latest())
+        map.record(500, 60); assertEquals(FrameTimestampToken(500, 60), map.latest())
+        map.record(-1, 80); assertEquals(FrameTimestampToken(-1, null), map.latest())
+        map.record(600, -1); assertEquals(FrameTimestampToken(600, null), map.latest())
+        map.clear(); assertNull(map.latest())
     }
     @Test fun `redraws preserve matches and seeks wait for a new frame`() {
         val map = FrameTimestampMap()
