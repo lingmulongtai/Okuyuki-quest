@@ -50,6 +50,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     testImplementation("junit:junit:4.13.2")
 
+    implementation("androidx.media3:media3-exoplayer:1.11.1")
+    implementation("androidx.media3:media3-ui:1.11.1")
+    implementation("androidx.media3:media3-datasource-okhttp:1.11.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     compileOnly("com.meta.metavr:metavr-os-jsdk:207")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
