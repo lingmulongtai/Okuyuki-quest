@@ -91,8 +91,8 @@ fun QuestApp(model: QuestViewModel) {
                         }
                         val sources = remember(share) { listOfNotNull(model.videoSource(), model.videoSource()) }
                         if (sources.size == 2) when (share?.format) {
-                            PanoramaVideoFormat.OSMO_LRF -> QuestOsmoProxy(sources[0], Modifier.weight(1f).fillMaxWidth())
-                            PanoramaVideoFormat.OSMO_OSV -> QuestOsmoVideo(sources, Modifier.weight(1f).fillMaxWidth())
+                            PanoramaVideoFormat.OSMO_LRF -> QuestOsmoProxy(sources[0], share.calibration, Modifier.weight(1f).fillMaxWidth())
+                            PanoramaVideoFormat.OSMO_OSV -> QuestOsmoVideo(sources, share.calibration, Modifier.weight(1f).fillMaxWidth())
                             else -> QuestPanoramaVideo(sources[0], Modifier.weight(1f).fillMaxWidth())
                         }
                     }

@@ -1,5 +1,6 @@
 package com.okuyuki.quest
 
+import com.okuyuki.protocol.PanoramaStereoCalibration
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,7 +23,7 @@ import kotlin.math.abs
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
-fun QuestOsmoVideo(sources: List<MediaSource>, modifier: Modifier = Modifier) {
+fun QuestOsmoVideo(sources: List<MediaSource>, calibration: PanoramaStereoCalibration?, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     var failed by remember(sources) { mutableStateOf(false) }
@@ -42,7 +43,7 @@ fun QuestOsmoVideo(sources: List<MediaSource>, modifier: Modifier = Modifier) {
             }
         }
     }
-    val view = remember(players) { DualTrackFisheyeView(context, players) { failed = true } }
+    val view = remember(players) { DualTrackFisheyeView(context, players, calibration) { failed = true } }
     DisposableEffect(owner, players, view) {
         val listeners = players.mapIndexed { playerIndex, player ->
             object : Player.Listener {
@@ -105,7 +106,7 @@ fun QuestOsmoVideo(sources: List<MediaSource>, modifier: Modifier = Modifier) {
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("OSV · 実験的な魚眼プレビュー", style = MaterialTheme.typography.titleLarge)
-        Text("レンズ・手ぶれ補正なし。映像のずれや継ぎ目が生じます。")
+        Text(if (calibration != null) "レンズ校正を適用中（実験的）。手ぶれ補正は未対応です。" else "レンズ・手ぶれ補正なし。映像のずれや継ぎ目が生じます。")
         AndroidView(factory = { view }, modifier = Modifier.fillMaxWidth().weight(1f))
         if (failed) Text("OSVを再生できません。2つの4K HEVC映像を同時に扱えない場合があります。", color = MaterialTheme.colorScheme.error)
         Slider(value = position.toFloat().coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),

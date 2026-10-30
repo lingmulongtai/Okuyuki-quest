@@ -1,5 +1,7 @@
 package com.okuyuki.quest
 
+import com.okuyuki.protocol.PanoramaStereoCalibration
+import com.okuyuki.protocol.PanoramaLensCalibration
 import android.content.Context
 import android.graphics.SurfaceTexture
 import android.opengl.GLES11Ext
@@ -13,8 +15,8 @@ import java.nio.ByteOrder
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
-/** Approximate dual-fisheye preview. Camera calibration and stabilization are not applied. */
-class DualTrackFisheyeView(context: Context, private val players: List<ExoPlayer>, private val onError: () -> Unit) : GLSurfaceView(context) {
+/** Dual-track preview with optional validated camera calibration. */
+class DualTrackFisheyeView(context: Context, private val players: List<ExoPlayer>, private val calibration: PanoramaStereoCalibration? = null, private val onError: () -> Unit) : GLSurfaceView(context) {
     private val renderer = FisheyeRenderer()
     private var lastX = 0f
     private var lastY = 0f
@@ -128,6 +130,17 @@ class DualTrackFisheyeView(context: Context, private val players: List<ExoPlayer
             GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "aspect"), aspect)
             GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "yaw"), yaw)
             GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "pitch"), pitch)
+            GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "calibrated"), if (calibration == null) 0f else 1f)
+            calibration?.let { value ->
+                fun setLens(prefix: String, lens: PanoramaLensCalibration) {
+                    val intrinsics = lens.intrinsics.map { it / 3840f }.toFloatArray()
+                    GLES20.glUniform4fv(GLES20.glGetUniformLocation(program, prefix + "Intrinsics"), 1, intrinsics, 0)
+                    GLES20.glUniform4fv(GLES20.glGetUniformLocation(program, prefix + "Distortion"), 1, lens.distortion.toFloatArray(), 0)
+                    GLES20.glUniform1f(GLES20.glGetUniformLocation(program, prefix + "K5"), lens.distortion[4])
+                    GLES20.glUniform4fv(GLES20.glGetUniformLocation(program, prefix + "Quaternion"), 1, lens.quaternion.toFloatArray(), 0)
+                }
+                setLens("left", value.left); setLens("right", value.right)
+            }
             for (i in 0..1) {
                 GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(program, "texMatrix$i"), 1, false, textureMatrices[i], 0)
                 GLES20.glActiveTexture(GLES20.GL_TEXTURE0 + i)
@@ -147,7 +160,11 @@ class DualTrackFisheyeView(context: Context, private val players: List<ExoPlayer
         """
         private const val FRAGMENT_SHADER = """
             #extension GL_OES_EGL_image_external : require
+            #ifdef GL_FRAGMENT_PRECISION_HIGH
+            precision highp float;
+            #else
             precision mediump float;
+            #endif
             varying vec2 screen;
             uniform samplerExternalOES video0;
             uniform samplerExternalOES video1;
@@ -156,6 +173,14 @@ class DualTrackFisheyeView(context: Context, private val players: List<ExoPlayer
             uniform float aspect;
             uniform float yaw;
             uniform float pitch;
+            uniform float calibrated;
+            uniform vec4 leftIntrinsics, rightIntrinsics;
+            uniform vec4 leftDistortion, rightDistortion;
+            uniform float leftK5, rightK5;
+            uniform vec4 leftQuaternion, rightQuaternion;
+            vec3 rotateQuaternion(vec4 q, vec3 v) {
+                return v + 2.0 * cross(q.yzw, cross(q.yzw, v) + q.x * v);
+            }
             void main() {
                 vec3 ray = normalize(vec3(screen.x * aspect, screen.y, 1.0));
                 float cp = cos(pitch), sp = sin(pitch);
@@ -163,6 +188,26 @@ class DualTrackFisheyeView(context: Context, private val players: List<ExoPlayer
                 float cy = cos(yaw), sy = sin(yaw);
                 ray = vec3(cy * ray.x + sy * ray.z, ray.y, -sy * ray.x + cy * ray.z);
                 bool back = ray.z < 0.0;
+                if (calibrated > 0.5) {
+                    vec4 intr = back ? rightIntrinsics : leftIntrinsics;
+                    vec4 k = back ? rightDistortion : leftDistortion;
+                    float k5 = back ? rightK5 : leftK5;
+                    vec4 q = back ? rightQuaternion : leftQuaternion;
+                    vec3 lens = rotateQuaternion(q, vec3(-ray.x, -ray.z, ray.y));
+                    float xy = length(lens.xy);
+                    float theta = atan(xy, lens.z);
+                    float t2 = theta * theta;
+                    float radius = theta * (1.0 + t2 * (k.x + t2 * (k.y + t2 * (k.z + t2 * (k.w + t2 * k5)))));
+                    vec2 unit = xy > 0.0001 ? lens.xy / xy : vec2(0.0);
+                    vec2 sensor = intr.zw + intr.xy * radius * unit;
+                    if (sensor.x < 0.0 || sensor.x > 1.0 || sensor.y < 0.0 || sensor.y > 1.0) {
+                        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return;
+                    }
+                    vec2 uv = vec2(sensor.x, 1.0 - sensor.y);
+                    if (back) gl_FragColor = texture2D(video1, (texMatrix1 * vec4(uv, 0.0, 1.0)).xy);
+                    else gl_FragColor = texture2D(video0, (texMatrix0 * vec4(uv, 0.0, 1.0)).xy);
+                    return;
+                }
                 vec2 plane = vec2(back ? -ray.x : ray.x, ray.y);
                 float theta = acos(clamp(abs(ray.z), 0.0, 1.0));
                 float lengthXY = length(plane);

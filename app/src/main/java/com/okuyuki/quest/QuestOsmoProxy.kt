@@ -1,5 +1,6 @@
 package com.okuyuki.quest
 
+import com.okuyuki.protocol.PanoramaStereoCalibration
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
@@ -21,7 +22,7 @@ import kotlinx.coroutines.delay
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
-fun QuestOsmoProxy(source: MediaSource, modifier: Modifier = Modifier) {
+fun QuestOsmoProxy(source: MediaSource, calibration: PanoramaStereoCalibration?, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     var failed by remember(source) { mutableStateOf(false) }
@@ -34,7 +35,7 @@ fun QuestOsmoProxy(source: MediaSource, modifier: Modifier = Modifier) {
             setMediaSource(source); prepare(); playWhenReady = true
         }
     }
-    val view = remember(player) { DualFisheyeView(context, player) { failed = true; player.pause() } }
+    val view = remember(player) { DualFisheyeView(context, player, calibration) { failed = true; player.pause() } }
     DisposableEffect(owner, player, view) {
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) { failed = true }
@@ -71,7 +72,7 @@ fun QuestOsmoProxy(source: MediaSource, modifier: Modifier = Modifier) {
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("LRF · 実験的な魚眼プレビュー", style = MaterialTheme.typography.titleLarge)
-        Text("レンズ・手ぶれ補正なし。映像のずれや継ぎ目が生じます。")
+        Text(if (calibration != null) "レンズ校正を適用中（実験的）。手ぶれ補正は未対応です。" else "レンズ・手ぶれ補正なし。映像のずれや継ぎ目が生じます。")
         AndroidView(factory = { view }, modifier = Modifier.fillMaxWidth().weight(1f))
         if (failed) Text("LRFを再生できません。通信状態と対応形式を確認してください。", color = MaterialTheme.colorScheme.error)
         Slider(value = position.toFloat().coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
