@@ -31,24 +31,7 @@ internal class AppUpdates(private val context: Context, private val scope: Corou
         job = scope.launch {
             status = "checking"
             try {
-                val found = withContext(Dispatchers.IO) {
-                    val connection = connect("https://api.github.com/repos/lingmulongtai/Okuyuki-quest/releases?per_page=30")
-                    try {
-                        val bytes = connection.inputStream.use { input ->
-                            val output = java.io.ByteArrayOutputStream()
-                            val buffer = ByteArray(8192)
-                            while (true) {
-                                ensureActive()
-                                val count = input.read(buffer)
-                                if (count < 0) break
-                                require(output.size() + count <= 8_000_000)
-                                output.write(buffer, 0, count)
-                            }
-                            output.toByteArray()
-                        }
-                        ReleaseCatalog.find(bytes.toString(Charsets.UTF_8), BuildConfig.VERSION_NAME, "quest")
-                    } finally { connection.disconnect() }
-                }
+                val found = withContext(Dispatchers.IO) { findRelease() }
                 release = found
                 if (found == null) status = "current" else {
                     status = "downloading"
@@ -59,6 +42,38 @@ internal class AppUpdates(private val context: Context, private val scope: Corou
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { status = "error" }
         }
+    }
+
+    private suspend fun findRelease(): UpdateRelease? {
+        val repo = "quest"
+        val base = "https://github.com/lingmulongtai/Okuyuki-$repo"
+        try {
+            val json = readText("https://api.github.com/repos/lingmulongtai/Okuyuki-$repo/releases?per_page=30", 8_000_000)
+            return ReleaseCatalog.find(json, BuildConfig.VERSION_NAME, repo)
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) {
+            val tag = ReleaseCatalog.latestFeedTag(readText("$base/releases.atom", 2_000_000), BuildConfig.VERSION_NAME, repo) ?: return null
+            val sums = readText("$base/releases/download/$tag/SHA256SUMS.txt", 64_000)
+            return ReleaseCatalog.fromChecksums(tag, sums, repo) ?: error("Missing APK checksum")
+        }
+    }
+
+    private suspend fun readText(url: String, limit: Int): String {
+        val connection = connect(url)
+        try {
+            return connection.inputStream.use { input ->
+                val output = java.io.ByteArrayOutputStream()
+                val buffer = ByteArray(8192)
+                while (true) {
+                    currentCoroutineContext().ensureActive()
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    require(output.size() + count <= limit)
+                    output.write(buffer, 0, count)
+                }
+                output.toString(Charsets.UTF_8.name())
+            }
+        } finally { connection.disconnect() }
     }
 
     private suspend fun download(update: UpdateRelease): File {
@@ -78,11 +93,11 @@ internal class AppUpdates(private val context: Context, private val scope: Corou
                         val count = input.read(buffer)
                         if (count < 0) break
                         total += count
-                        require(total <= update.size)
+                        require(total <= if (update.size == 0L) 536_870_912L else update.size)
                         output.write(buffer, 0, count)
                     }
                 } }
-                require(total == update.size)
+                require(total > 0 && (update.size == 0L || total == update.size))
             } finally { connection.disconnect() }
             check(verify(partial, update))
             currentCoroutineContext().ensureActive()
@@ -93,7 +108,7 @@ internal class AppUpdates(private val context: Context, private val scope: Corou
     }
 
     private suspend fun verify(file: File, update: UpdateRelease): Boolean {
-        if (file.length() != update.size) return false
+        if (file.length() !in 1..536_870_912L || (update.size != 0L && file.length() != update.size)) return false
         val digest = MessageDigest.getInstance("SHA-256")
         file.inputStream().use { input ->
             val buffer = ByteArray(64 * 1024)
