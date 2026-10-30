@@ -1,0 +1,15 @@
+<resources>
+    <string name="update_title">App updates</string>
+    <string name="update_description">Updates are checked when the app opens.</string>
+    <string name="update_check">Check for updates</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_downloading">Downloading and verifying the update…</string>
+    <string name="update_ready">The update is ready to install.</string>
+    <string name="update_current">You are up to date.</string>
+    <string name="update_error">Could not get the update. Check your connection and try again.</string>
+    <string name="update_install_error">Could not open the installer. Check your device installation settings.</string>
+    <string name="update_available">An update is available</string>
+    <string name="update_prompt">Version %1$s has been verified. Install it? The first time, allow installation from this app, return, and tap again.</string>
+    <string name="update_install">Install</string>
+    <string name="update_later">Later</string>
+</resources>

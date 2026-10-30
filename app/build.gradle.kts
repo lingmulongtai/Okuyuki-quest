@@ -11,8 +11,8 @@ android {
         applicationId = "com.okuyuki.quest"
         minSdk = 32
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0-alpha.1"
+        versionCode = 11
+        versionName = "0.1.0-alpha.12-preview"
         ndk { abiFilters += "arm64-v8a" }
     }
     signingConfigs {
@@ -28,6 +28,7 @@ android {
         isMinifyEnabled = false
         signingConfig = signingConfigs.findByName("release")
     } }
+    externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.22.1" } }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -50,6 +51,12 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     testImplementation("junit:junit:4.13.2")
 
+    implementation("androidx.media3:media3-exoplayer:1.11.1")
+    implementation("androidx.media3:media3-ui:1.11.1")
+    implementation("androidx.media3:media3-datasource-okhttp:1.11.1")
+    implementation("com.meta.spatial:meta-spatial-sdk:0.14.0")
+    implementation("com.meta.spatial:meta-spatial-sdk-toolkit:0.14.0")
+    implementation("com.meta.spatial:meta-spatial-sdk-vr:0.14.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     compileOnly("com.meta.metavr:metavr-os-jsdk:207")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
