@@ -9,6 +9,7 @@ object Protocol {
     const val PAGE_SIZE = 48
     const val MAX_ORIGINAL_BYTES = 256L * 1024 * 1024
     const val MAX_PANORAMA_PHOTO_BYTES = 64L * 1024 * 1024
+    const val MAX_PANORAMA_VIDEO_BYTES = 64L * 1024 * 1024 * 1024
     val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 }
 
@@ -38,6 +39,12 @@ data class LibraryPage(val items: List<Photo>, val next: String? = null)
 @Serializable
 data class PanoramaPhotoShare(val id: String, val sizeBytes: Long) {
     fun isValid(): Boolean = id.matches(Regex("[0-9a-f]{32}")) && sizeBytes in 1..Protocol.MAX_PANORAMA_PHOTO_BYTES
+}
+
+/** An explicitly shared, already-stitched equirectangular MP4 video. */
+@Serializable
+data class PanoramaVideoShare(val id: String, val sizeBytes: Long) {
+    fun isValid(): Boolean = id.matches(Regex("[0-9a-f]{32}")) && sizeBytes in 1..Protocol.MAX_PANORAMA_VIDEO_BYTES
 }
 
 @Serializable

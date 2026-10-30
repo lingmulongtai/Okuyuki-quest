@@ -15,6 +15,14 @@ class ProtocolTest {
         assertFalse(valid.copy(sizeBytes = 0).isValid())
         assertFalse(valid.copy(sizeBytes = Protocol.MAX_PANORAMA_PHOTO_BYTES + 1).isValid())
     }
+    @Test fun `video shares accept large files and reject unsafe identifiers or sizes`() {
+        val video = PanoramaVideoShare("0123456789abcdef0123456789abcdef", 5L * 1024 * 1024 * 1024)
+        assertTrue(video.isValid())
+        assertEquals(video, Protocol.json.decodeFromString<PanoramaVideoShare>(Protocol.json.encodeToString(video)))
+        assertFalse(video.copy(id = "../video").isValid())
+        assertFalse(video.copy(sizeBytes = 0).isValid())
+        assertFalse(video.copy(sizeBytes = Protocol.MAX_PANORAMA_VIDEO_BYTES + 1).isValid())
+    }
     @Test fun `resume and suffix ranges are bounded to the source`() {
         assertEquals(ByteRange(4, 9), ByteRange.parse("bytes=4-", 10))
         assertEquals(ByteRange(8, 9), ByteRange.parse("bytes=-2", 10))
