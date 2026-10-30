@@ -33,7 +33,9 @@ fun QuestApp(model: QuestViewModel) {
     var addressError by remember { mutableStateOf(false) }
     var settings by rememberSaveable { mutableStateOf(false) }
     val theme = darkColorScheme(primary = Color.White, onPrimary = Color(0xFF10131C), background = Color(0xFF090A0F), surface = Color(0xFF232630), onSurface = Color.White, onSurfaceVariant = Color(0xFFB5B6BD))
-    BackHandler(state.current != null) { model.backToLibrary() }
+    BackHandler(state.current != null || state.viewingPanorama) {
+        if (state.viewingPanorama) model.closePanorama() else model.backToLibrary()
+    }
     MaterialTheme(colorScheme = theme) {
         Surface(Modifier.fillMaxSize(), color = theme.background) {
             Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -61,8 +63,17 @@ fun QuestApp(model: QuestViewModel) {
                         Text(state.message)
                         OutlinedButton(onClick = { model.disconnect(); model.start() }) { Text("キャンセル") }
                     }
+                    state.viewingPanorama -> {
+                        TextButton(onClick = model::closePanorama) { Text("一覧に戻る") }
+                        Text("360°写真 · ウィンドウ内をドラッグして見回します")
+                        if (state.openingPanorama) CircularProgressIndicator()
+                        state.panoramaBytes?.let { QuestPanoramaPhoto(it, Modifier.weight(1f).fillMaxWidth()) }
+                    }
                     state.current != null -> Viewer(model, state)
                     state.connected -> {
+                        if (state.sharedPanorama != null) {
+                            OutlinedButton(onClick = model::openPanorama, modifier = Modifier.fillMaxWidth()) { Text("スマホで共有中の360°写真を開く") }
+                        }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("スマホの3D写真 · ${state.hello?.photoCount ?: state.photos.size}枚", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
                             TextButton(onClick = model::refresh) { Text("更新") }
