@@ -1,14 +1,14 @@
 # Galaxy・Quest 実機テスト用プレビュー
 
-両アプリの **v0.1.0-alpha.11-preview** を組み合わせてください。長尺動画の共有・補正には両方の更新が必要です。GalaxyはAndroid 16以降、Quest 3／3Sは開発者モードとUSBデバッグが必要です。この版は実験段階で、Galaxy・Quest実機での動作は未確認です。
+両アプリの **v0.1.0-alpha.12-preview** を組み合わせてください。長尺動画の共有・補正には両方の更新が必要です。GalaxyはAndroid 16以降、Quest 3／3Sは開発者モードとUSBデバッグが必要です。この版は実験段階で、Galaxy・Quest実機での動作は未確認です。
 
-1. [Galaxy用APK](https://github.com/lingmulongtai/Okuyuki-android/releases/download/v0.1.0-alpha.11-preview/Okuyuki-android-v0.1.0-alpha.11-preview.apk)をGalaxyに、[Quest用APK](https://github.com/lingmulongtai/Okuyuki-quest/releases/download/v0.1.0-alpha.11-preview/Okuyuki-quest-v0.1.0-alpha.11-preview.apk)をWindows PCにダウンロードします。GalaxyでAPKを開き、必要に応じてインストール元を許可して更新します。
+1. [Galaxy用APK](https://github.com/lingmulongtai/Okuyuki-android/releases/download/v0.1.0-alpha.12-preview/Okuyuki-android-v0.1.0-alpha.12-preview.apk)をGalaxyに、[Quest用APK](https://github.com/lingmulongtai/Okuyuki-quest/releases/download/v0.1.0-alpha.12-preview/Okuyuki-quest-v0.1.0-alpha.12-preview.apk)をWindows PCにダウンロードします。GalaxyでAPKを開き、必要に応じてインストール元を許可して更新します。
 2. Questで開発者モードを有効にし、PCにUSB接続してヘッドセット内でUSBデバッグを許可します。PowerShellで次を実行します。`QUEST_SERIAL` は `devices -l` に表示されるQuestのシリアル番号です。
 
    ```powershell
    $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
    & $adb devices -l
-   & $adb -s "QUEST_SERIAL" install -r "$env:USERPROFILE\Downloads\Okuyuki-quest-v0.1.0-alpha.11-preview.apk"
+   & $adb -s "QUEST_SERIAL" install -r "$env:USERPROFILE\Downloads\Okuyuki-quest-v0.1.0-alpha.12-preview.apk"
    ```
 
 3. Questのアプリライブラリで「提供元不明」からOkuyuki Questを開きます。GalaxyとQuestを同じWi-Fiに接続し、Galaxyの「Quest」タブで接続待機をオンにします。Questでスマホを選び、両画面の4桁の番号を確認してGalaxyで承認します。自動検出されない場合はGalaxyに表示されたIPアドレスとポートをQuestに入力します。

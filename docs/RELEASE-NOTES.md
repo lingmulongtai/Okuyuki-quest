@@ -1,8 +1,10 @@
-# Okuyuki v0.1.0-alpha.11-preview
+# Okuyuki v0.1.0-alpha.12-preview
 
-GalaxyとQuestの両方に、このプレビュー版をインストールしてください。長尺動画の共有・補正には両方の更新が必要です。対応OS、ダウンロード、更新、ペアリング、360°動画の共有と没入表示の手順は [実機テスト用ガイド](https://github.com/lingmulongtai/Okuyuki-android/blob/v0.1.0-alpha.11-preview/docs/DEVICE-PREVIEW.md) を参照してください。
+GalaxyとQuestの両方に、このプレビュー版をインストールしてください。長尺動画の共有・補正には両方の更新が必要です。対応OS、ダウンロード、更新、ペアリング、360°動画の共有と没入表示の手順は [実機テスト用ガイド](https://github.com/lingmulongtai/Okuyuki-android/blob/v0.1.0-alpha.12-preview/docs/DEVICE-PREVIEW.md) を参照してください。
 
 起動時に更新を自動確認し、APKのハッシュ・署名・パッケージを検証してダウンロードします。インストールはOS上の確認が必要です。alpha.9以前からの更新は一度手動で行ってください。Questでのアプリ内インストールは実機未検証です。
+
+GitHub API の利用上限時に、公開リリース情報とチェックサムから更新を確認する代替経路を追加しました。署名、パッケージ、バージョンも引き続き検証します。alpha.10・alpha.11で更新エラーが続く場合はこの版を一度手動で上書きしてください。
 
 ## デザインの更新
 
