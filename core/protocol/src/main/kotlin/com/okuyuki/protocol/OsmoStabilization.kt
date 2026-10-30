@@ -72,17 +72,19 @@ class FrameCorrectionMatcher(private val timestamps: FrameTimestampMap, private 
 class OsmoStabilization(track: OsmoMotionTrack) {
     private val frames = track.frames
     private val tolerance = track.frameIntervalUs / 2
-    private val corrections: List<FloatArray>
+    private val corrections: FloatArray
     init {
         require(OsmoMotionCodec.isValid(track))
         var previousTime = frames.first().presentationTimeUs
         var target = fromStored(frames.first().storedAttitude)
-        corrections = frames.map { frame ->
+        corrections = FloatArray(frames.size * 4)
+        frames.forEachIndexed { index, frame ->
             val current = fromStored(frame.storedAttitude)
             val dt = (frame.presentationTimeUs - previousTime).coerceAtLeast(0L).toDouble() / 1000000.0
             target = slerp(target, current, (1.0 - exp(-dt / 0.7)).toFloat())
             previousTime = frame.presentationTimeUs
-            multiply(floatArrayOf(current[0], -current[1], -current[2], -current[3]), target)
+            val correction = multiply(floatArrayOf(current[0], -current[1], -current[2], -current[3]), target)
+            correction.copyInto(corrections, index * 4)
         }
     }
     fun correctionAt(presentationUs: Long): FloatArray? {
@@ -94,7 +96,7 @@ class OsmoStabilization(track: OsmoMotionTrack) {
         }
         val index = if (low > 0 && presentationUs - frames[low - 1].presentationTimeUs < frames[low].presentationTimeUs - presentationUs) low - 1 else low
         if (kotlin.math.abs(frames[index].presentationTimeUs - presentationUs) > tolerance) return null
-        return corrections[index]
+        return corrections.copyOfRange(index * 4, index * 4 + 4)
     }
     companion object {
         internal fun fromStored(q: List<Float>): FloatArray {

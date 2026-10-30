@@ -75,4 +75,10 @@ class OsmoStabilizationTest {
         assertTrue(smooth.correctionAt(40000)!![2] < -0.5f)
         assertArrayEquals(smooth.correctionAt(40000), smooth.correctionAt(39000), 0.0001f)
     }
+    @Test fun `callers cannot alter stored corrections`() {
+        val frame = OsmoMotionFrame(0, listOf(0f, 0f, 0f, 1f))
+        val smooth = OsmoStabilization(OsmoMotionTrack(listOf(frame), 40000))
+        smooth.correctionAt(0)!![0] = 0f
+        assertArrayEquals(floatArrayOf(1f, 0f, 0f, 0f), smooth.correctionAt(0), 0.0001f)
+    }
 }
