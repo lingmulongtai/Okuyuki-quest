@@ -80,7 +80,7 @@ class OsmoStabilization(track: OsmoMotionTrack, checkActive: () -> Unit) {
     private val tolerance = track.frameIntervalUs / 2
     private val corrections: FloatArray
     init {
-        require(OsmoMotionCodec.isValid(track))
+        require(OsmoMotionCodec.isValid(track, checkActive))
         var previousTime = timeAt(0)
         var target = attitudeAt(0)
         corrections = FloatArray(frames.size * 4)

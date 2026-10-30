@@ -62,7 +62,10 @@ class OsmoMotionCodecTest {
         }
         var smoothChecks = 0
         assertThrows(java.util.concurrent.CancellationException::class.java) {
-            OsmoStabilization(decoded) { if (++smoothChecks == 3) throw java.util.concurrent.CancellationException() }
+            OsmoStabilization(decoded) { if (++smoothChecks == (count + 1023) / 1024 + 3) throw java.util.concurrent.CancellationException() }
+        }
+        assertThrows(java.util.concurrent.CancellationException::class.java) {
+            OsmoStabilization(decoded) { throw java.util.concurrent.CancellationException() }
         }
     }
     @Test fun `rejects malformed or oversized motion payloads`() {

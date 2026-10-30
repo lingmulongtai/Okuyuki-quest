@@ -22,7 +22,7 @@ object OsmoMotionCodec {
 
     fun isValid(track: OsmoMotionTrack): Boolean = isValid(track) { }
 
-    private fun isValid(track: OsmoMotionTrack, checkActive: () -> Unit): Boolean {
+    internal fun isValid(track: OsmoMotionTrack, checkActive: () -> Unit): Boolean {
         if (track.frames.size !in 1..MAX_FRAMES || track.frameIntervalUs !in 1L..1_000_000L) return false
         var previous = -1L
         val packed = track.frames as? PackedMotionFrames
