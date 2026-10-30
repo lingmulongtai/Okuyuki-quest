@@ -23,6 +23,7 @@ class QuestClient(val endpoint: Endpoint, private val cache: TemporaryPhotoCache
     private val http = OkHttpClient.Builder().connectTimeout(8, TimeUnit.SECONDS).readTimeout(40, TimeUnit.SECONDS)
         .followRedirects(false).followSslRedirects(false).build()
     private val downloads = Mutex()
+    private val panoramaDownloads = Mutex()
     var token: String? = null
     private var socket: WebSocket? = null
     private var heartbeat: Job? = null
@@ -50,9 +51,26 @@ class QuestClient(val endpoint: Endpoint, private val cache: TemporaryPhotoCache
         val path = after?.let { "/v1/library?after=${java.net.URLEncoder.encode(it, "UTF-8")}" } ?: "/v1/library"
         return json(request(path).build())
     }
+    private suspend fun <T> readResponse(request: Request, read: (Response) -> T): T = suspendCancellableCoroutine { continuation ->
+        val call = http.newCall(request)
+        continuation.invokeOnCancellation { call.cancel() }
+        call.enqueue(object : Callback {
+            override fun onFailure(call: Call, error: IOException) {
+                if (continuation.isActive) continuation.resumeWithException(error)
+            }
+            override fun onResponse(call: Call, response: Response) {
+                try {
+                    val value = response.use(read)
+                    if (continuation.isActive) continuation.resume(value)
+                } catch (error: Exception) {
+                    if (continuation.isActive) continuation.resumeWithException(error)
+                }
+            }
+        })
+    }
     /** Older phones do not expose this endpoint; an empty result is normal. */
-    suspend fun panoramaPhoto(): PanoramaPhotoShare? = execute(request("/v2/panorama/photo").build()).use { response ->
-        if (response.code == 204 || response.code == 404) return@use null
+    suspend fun panoramaPhoto(): PanoramaPhotoShare? = readResponse(request("/v2/panorama/photo").build()) { response ->
+        if (response.code == 204 || response.code == 404) return@readResponse null
         check(response.isSuccessful) { "360°写真の情報を取得できませんでした (${response.code})" }
         val body = response.body ?: error("応答が空です")
         require(body.contentLength() in -1..4096)
@@ -60,30 +78,22 @@ class QuestClient(val endpoint: Endpoint, private val cache: TemporaryPhotoCache
         require(share.isValid()) { "360°写真の情報が正しくありません" }
         share
     }
-    suspend fun panoramaPhotoBytes(share: PanoramaPhotoShare): ByteArray {
+    suspend fun panoramaPhotoBytes(share: PanoramaPhotoShare): ByteArray = panoramaDownloads.withLock {
         require(share.isValid())
-        return suspendCancellableCoroutine { continuation ->
-            val call = http.newCall(request("/v2/panorama/photo/${share.id}").build())
-            continuation.invokeOnCancellation { call.cancel() }
-            call.enqueue(object : Callback {
-                override fun onFailure(call: Call, error: IOException) {
-                    if (continuation.isActive) continuation.resumeWithException(error)
+        readResponse(request("/v2/panorama/photo/${share.id}").build()) { response ->
+            check(response.code == 200) { "360°写真を取得できませんでした (${response.code})" }
+            val body = response.body ?: error("画像が空です")
+            require(body.contentLength() == share.sizeBytes) { "360°写真のサイズが一致しません" }
+            val bytes = ByteArray(share.sizeBytes.toInt())
+            body.byteStream().use { stream ->
+                var offset = 0
+                while (offset < bytes.size) {
+                    val count = stream.read(bytes, offset, bytes.size - offset)
+                    require(count > 0) { "360°写真の転送が中断されました" }
+                    offset += count
                 }
-                override fun onResponse(call: Call, response: Response) {
-                    try {
-                        val bytes = response.use {
-                            check(it.code == 200) { "360°写真を取得できませんでした (${it.code})" }
-                            val body = it.body ?: error("画像が空です")
-                            require(body.contentLength() == share.sizeBytes) { "360°写真のサイズが一致しません" }
-                            body.byteStream().use { stream -> readBounded(stream, Protocol.MAX_PANORAMA_PHOTO_BYTES.toInt()) }
-                        }
-                        require(bytes.size.toLong() == share.sizeBytes) { "360°写真の転送が中断されました" }
-                        if (continuation.isActive) continuation.resume(bytes)
-                    } catch (error: Exception) {
-                        if (continuation.isActive) continuation.resumeWithException(error)
-                    }
-                }
-            })
+            }
+            bytes
         }
     }
     suspend fun thumbnail(id: String): ByteArray = execute(request("/v1/items/${safeId(id)}/thumb").build()).use {
