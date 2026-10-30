@@ -180,7 +180,8 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         if (!raw) return
         videoMotionJob = session.launch {
             try {
-                val track = withTimeoutOrNull(12000) { connection.panoramaVideoMotion(share) }
+                // OkHttp's read timeout bounds stalls; a progressing long transfer may need more than 12 seconds.
+                val track = connection.panoramaVideoMotion(share)
                 val correction = track?.let { withContext(Dispatchers.Default) { OsmoStabilization(it) } }
                 if (client !== connection) return@launch
                 _state.update { current ->

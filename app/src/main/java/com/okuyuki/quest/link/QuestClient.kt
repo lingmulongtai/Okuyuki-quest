@@ -51,7 +51,10 @@ class QuestClient(val endpoint: Endpoint, private val cache: TemporaryPhotoCache
         val path = after?.let { "/v1/library?after=${java.net.URLEncoder.encode(it, "UTF-8")}" } ?: "/v1/library"
         return json(request(path).build())
     }
-    private suspend fun <T> readResponse(request: Request, read: (Response) -> T): T = suspendCancellableCoroutine { continuation ->
+    private suspend fun <T> readResponse(request: Request, read: (Response) -> T): T =
+        readResponseChecked(request) { response, _ -> read(response) }
+
+    private suspend fun <T> readResponseChecked(request: Request, read: (Response, () -> Unit) -> T): T = suspendCancellableCoroutine { continuation ->
         val call = http.newCall(request)
         continuation.invokeOnCancellation { call.cancel() }
         call.enqueue(object : Callback {
@@ -60,7 +63,7 @@ class QuestClient(val endpoint: Endpoint, private val cache: TemporaryPhotoCache
             }
             override fun onResponse(call: Call, response: Response) {
                 try {
-                    val value = response.use(read)
+                    val value = response.use { read(it) { if (!continuation.isActive) throw CancellationException("Request cancelled") } }
                     if (continuation.isActive) continuation.resume(value)
                 } catch (error: Exception) {
                     if (continuation.isActive) continuation.resumeWithException(error)
@@ -97,12 +100,12 @@ class QuestClient(val endpoint: Endpoint, private val cache: TemporaryPhotoCache
     /** Motion data is optional on older hosts and is bound to the selected video ID. */
     suspend fun panoramaVideoMotion(share: PanoramaVideoShare): OsmoMotionTrack? {
         require(share.isValid() && share.format != PanoramaVideoFormat.EQUIRECTANGULAR_MP4)
-        return readResponse(request("/v3/panorama/video/${share.id}/motion").build()) { response ->
-            if (response.code == 204 || response.code == 404) return@readResponse null
+        return readResponseChecked(request("/v3/panorama/video/${share.id}/motion").build()) { response, checkActive ->
+            if (response.code == 204 || response.code == 404) return@readResponseChecked null
             check(response.code == 200) { "動画の姿勢情報を取得できませんでした (${response.code})" }
             val body = response.body ?: error("姿勢情報が空です")
             require(body.contentLength() in -1..OsmoMotionCodec.MAX_BYTES.toLong()) { "姿勢情報が大きすぎます" }
-            OsmoMotionCodec.decode(readBounded(body.byteStream(), OsmoMotionCodec.MAX_BYTES))
+            OsmoMotionCodec.decode(body.byteStream(), body.contentLength(), checkActive)
         }
     }
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)

@@ -156,6 +156,21 @@ class QuestClientTest {
             }
         }
     }
+    @Test fun `long motion can be decoded from a chunked response`() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            val share = PanoramaVideoShare("0123456789abcdef0123456789abcdef", 10, PanoramaVideoFormat.OSMO_OSV)
+            val builder = com.okuyuki.protocol.PackedMotionFrames.Builder(50_001)
+            repeat(50_001) { builder.add(it * 20_000L, 0f, 0f, 0f, 1f) }
+            val motion = OsmoMotionTrack(builder.build(), 20_000)
+            server.enqueue(MockResponse().setChunkedBody(Buffer().write(OsmoMotionCodec.encode(motion)), 4096))
+            QuestClient(Endpoint(server.hostName, server.port), TemporaryPhotoCache(folder.newFolder())).use { client ->
+                val received = client.panoramaVideoMotion(share)!!
+                assertEquals(50_001, received.frames.size)
+                assertEquals(1_000_000_000L, received.frames.last().presentationTimeUs)
+            }
+        }
+    }
     @Test fun `download resumes at the exact offset and carries the pairing token`() = runBlocking {
         MockWebServer().use { server ->
             server.start()
