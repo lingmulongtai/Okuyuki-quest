@@ -1,6 +1,6 @@
 # GalaxyとQuest 3Sへのインストール・接続
 
-`v0.1.0-alpha.8-preview` の手順です。GalaxyにAndroid版、Quest 3SにQuest版のAPKを入れます。
+`v0.1.0-alpha.9-preview` の手順です。GalaxyにAndroid版、Quest 3SにQuest版のAPKを入れます。
 Quest版はPCからUSB経由でインストールします。導入後はGalaxyとQuestだけで使えます。
 
 ## 用意するもの
@@ -18,10 +18,10 @@ Quest版はPCからUSB経由でインストールします。導入後はGalaxy�
 
 | 入れる端末 | 保存する場所 | APK |
 | --- | --- | --- |
-| Galaxy | Galaxyのダウンロードフォルダ | [Okuyuki-android-v0.1.0-alpha.8-preview.apk](https://github.com/lingmulongtai/Okuyuki-android/releases/download/v0.1.0-alpha.8-preview/Okuyuki-android-v0.1.0-alpha.8-preview.apk) |
-| Quest 3S | **PCのダウンロードフォルダ** | [Okuyuki-quest-v0.1.0-alpha.8-preview.apk](https://github.com/lingmulongtai/Okuyuki-quest/releases/download/v0.1.0-alpha.8-preview/Okuyuki-quest-v0.1.0-alpha.8-preview.apk) |
+| Galaxy | Galaxyのダウンロードフォルダ | [Okuyuki-android-v0.1.0-alpha.9-preview.apk](https://github.com/lingmulongtai/Okuyuki-android/releases/download/v0.1.0-alpha.9-preview/Okuyuki-android-v0.1.0-alpha.9-preview.apk) |
+| Quest 3S | **PCのダウンロードフォルダ** | [Okuyuki-quest-v0.1.0-alpha.9-preview.apk](https://github.com/lingmulongtai/Okuyuki-quest/releases/download/v0.1.0-alpha.9-preview/Okuyuki-quest-v0.1.0-alpha.9-preview.apk) |
 
-[Androidのリリース](https://github.com/lingmulongtai/Okuyuki-android/releases/tag/v0.1.0-alpha.8-preview)・[Questのリリース](https://github.com/lingmulongtai/Okuyuki-quest/releases/tag/v0.1.0-alpha.8-preview)にはチェックサム、署名情報、検証記録もあります。
+[Androidのリリース](https://github.com/lingmulongtai/Okuyuki-android/releases/tag/v0.1.0-alpha.9-preview)・[Questのリリース](https://github.com/lingmulongtai/Okuyuki-quest/releases/tag/v0.1.0-alpha.9-preview)にはチェックサム、署名情報、検証記録もあります。
 GitHubの「Source code」のZIPではなく、上の `.apk` を保存してください。
 
 ## 2. GalaxyにAndroid版を入れる
@@ -75,7 +75,7 @@ Questの行の状態が `device` になっていることを確認します。`u
 **同じPowerShell** で、`QUEST_SERIAL` を `devices -l` に表示されたQuestのシリアル番号に置き換えて実行します。`-s` でQuestを選ぶため、Galaxyなど別の端末が接続されていても対象を指定できます。
 
 ```powershell
-& $adb -s "QUEST_SERIAL" install -r "$env:USERPROFILE\Downloads\Okuyuki-quest-v0.1.0-alpha.8-preview.apk"
+& $adb -s "QUEST_SERIAL" install -r "$env:USERPROFILE\Downloads\Okuyuki-quest-v0.1.0-alpha.9-preview.apk"
 ```
 
 `Success` と出たら完了です。保存先やファイル名が異なる場合は最後のパスを変更してください。

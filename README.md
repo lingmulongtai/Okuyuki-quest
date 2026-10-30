@@ -10,12 +10,12 @@ Project: https://github.com/users/lingmulongtai/projects/2
 
 **開発版で360°写真・動画の共有を試す場合:** [Galaxy・Quest実機テスト用プレビュー](docs/DEVICE-PREVIEW.md)をご覧ください。
 
-配布中のアルファは **v0.1.0-alpha.8-preview** です。Galaxyは **Android 16** が必要です。
+配布中のアルファは **v0.1.0-alpha.9-preview** です。Galaxyは **Android 16** が必要です。
 
 | 入れる端末 | APKの直接ダウンロード | 保存先 |
 | --- | --- | --- |
-| Galaxy | [Android版APK](https://github.com/lingmulongtai/Okuyuki-android/releases/download/v0.1.0-alpha.8-preview/Okuyuki-android-v0.1.0-alpha.8-preview.apk) | Galaxy |
-| Quest 3S／3 | [Quest版APK](https://github.com/lingmulongtai/Okuyuki-quest/releases/download/v0.1.0-alpha.8-preview/Okuyuki-quest-v0.1.0-alpha.8-preview.apk) | Windows PC |
+| Galaxy | [Android版APK](https://github.com/lingmulongtai/Okuyuki-android/releases/download/v0.1.0-alpha.9-preview/Okuyuki-android-v0.1.0-alpha.9-preview.apk) | Galaxy |
+| Quest 3S／3 | [Quest版APK](https://github.com/lingmulongtai/Okuyuki-quest/releases/download/v0.1.0-alpha.9-preview/Okuyuki-quest-v0.1.0-alpha.9-preview.apk) | Windows PC |
 
 1. **Galaxy**: Android版APKを開き、インストール元の許可を与えて入れます。Okuyukiの写真アクセスを許可し、ライブラリに試したい3D写真があることを確認します。
 2. **Quest**: Meta Horizonアプリで開発者モードをオンにし、PCとUSB接続してQuest内のUSBデバッグを許可します。PCからADBでQuest版APKを入れ、アプリライブラリーの「提供元不明」から **Okuyuki Quest** を開きます。
