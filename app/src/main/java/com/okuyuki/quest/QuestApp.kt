@@ -73,14 +73,15 @@ fun QuestApp(model: QuestViewModel) {
                         TextButton(onClick = model::closeVideo) { Text("一覧に戻る") }
                         Text("360°動画 · ウィンドウ内プレビュー")
                         val share = state.sharedVideo
+                        val videoGeneration = state.videoGeneration
                         if (state.videoMotionLoading) {
                             LinearProgressIndicator(Modifier.fillMaxWidth())
                             Text("スマホから姿勢情報を確認しています…")
                         }
                         if (share != null && share.format in listOf(PanoramaVideoFormat.OSMO_LRF, PanoramaVideoFormat.OSMO_OSV) && !state.videoMotionLoading && state.videoMotion != null) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = state.videoStabilizationEnabled, onCheckedChange = { model.setVideoStabilization(it, share.id, state.videoGeneration) })
-                                Text(if (share.format == PanoramaVideoFormat.OSMO_OSV) "没入表示の手ぶれ補正（実験的）" else "手ぶれ補正（実験的）")
+                                Checkbox(checked = state.videoStabilizationEnabled, onCheckedChange = { model.setVideoStabilization(it, share.id, videoGeneration) })
+                                Text("手ぶれ補正（実験的）")
                             }
                             if (state.videoStabilizationUnavailable) Text("映像フレームと姿勢を照合できないため、補正をオフにしました。")
                         }
@@ -103,8 +104,9 @@ fun QuestApp(model: QuestViewModel) {
                         val sources = remember(share) { listOfNotNull(model.videoSource(), model.videoSource()) }
                         if (!state.videoMotionLoading && sources.size == 2) when (share?.format) {
                             PanoramaVideoFormat.OSMO_LRF -> QuestOsmoProxy(sources[0], share.calibration, state.videoMotion, state.videoStabilizationEnabled,
-                                { model.videoStabilizationUnavailable(share.id, state.videoGeneration) }, Modifier.weight(1f).fillMaxWidth())
-                            PanoramaVideoFormat.OSMO_OSV -> QuestOsmoVideo(sources, share.calibration, Modifier.weight(1f).fillMaxWidth())
+                                { model.videoStabilizationUnavailable(share.id, videoGeneration) }, Modifier.weight(1f).fillMaxWidth())
+                            PanoramaVideoFormat.OSMO_OSV -> QuestOsmoVideo(sources, share.calibration, state.videoMotion, state.videoStabilizationEnabled,
+                                { model.videoStabilizationUnavailable(share.id, videoGeneration) }, Modifier.weight(1f).fillMaxWidth())
                             else -> QuestPanoramaVideo(sources[0], Modifier.weight(1f).fillMaxWidth())
                         }
                     }

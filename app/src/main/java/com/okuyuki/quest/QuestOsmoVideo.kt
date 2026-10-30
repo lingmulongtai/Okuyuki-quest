@@ -1,11 +1,14 @@
 package com.okuyuki.quest
 
+import android.os.SystemClock
 import com.okuyuki.protocol.PanoramaStereoCalibration
+import com.okuyuki.protocol.OsmoStabilization
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -19,19 +22,24 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.delay
-import kotlin.math.abs
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
-fun QuestOsmoVideo(sources: List<MediaSource>, calibration: PanoramaStereoCalibration?, modifier: Modifier = Modifier) {
+fun QuestOsmoVideo(sources: List<MediaSource>, calibration: PanoramaStereoCalibration?, stabilization: OsmoStabilization?,
+    stabilizationEnabled: Boolean, onStabilizationUnavailable: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
+    val windowFocused = LocalWindowInfo.current.isWindowFocused
     var failed by remember(sources) { mutableStateOf(false) }
     var wantPlaying by remember(sources) { mutableStateOf(true) }
     var syncReady by remember(sources) { mutableStateOf(false) }
     var position by remember(sources) { mutableLongStateOf(0L) }
     var duration by remember(sources) { mutableLongStateOf(0L) }
     var seeking by remember(sources) { mutableStateOf(false) }
+    var resettingSeek by remember(sources) { mutableStateOf(false) }
+    var pausePending by remember(sources) { mutableStateOf(false) }
+    var active by remember(owner) { mutableStateOf(owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) }
+    var ended by remember(sources) { mutableStateOf(false) }
     val selected = remember(sources) { BooleanArray(2) }
     val expectedGroups = remember(sources) { arrayOfNulls<androidx.media3.common.TrackGroup>(2) }
     val expectedIndices = remember(sources) { IntArray(2) }
@@ -45,7 +53,12 @@ fun QuestOsmoVideo(sources: List<MediaSource>, calibration: PanoramaStereoCalibr
             }
         }
     }
-    val view = remember(players) { DualTrackFisheyeView(context, players, calibration) { failed = true } }
+    val view = remember(players, calibration, stabilization) { DualTrackFisheyeView(context, players, calibration, stabilization,
+        onStabilizationUnavailable = onStabilizationUnavailable) { failed = true } }
+    LaunchedEffect(view, stabilizationEnabled) { view.setStabilizationEnabled(stabilizationEnabled) }
+    LaunchedEffect(view, windowFocused) {
+        if (!windowFocused) { pausePending = false; view.resumeFrames(); wantPlaying = false; players.forEach { it.pause() } }
+    }
     DisposableEffect(owner, players, view) {
         val listeners = players.mapIndexed { playerIndex, player ->
             object : Player.Listener {
@@ -79,8 +92,8 @@ fun QuestOsmoVideo(sources: List<MediaSource>, calibration: PanoramaStereoCalibr
         players.forEach { it.prepare() }
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> view.onResume()
-                Lifecycle.Event.ON_STOP -> { wantPlaying = false; players.forEach { it.pause() }; view.onPause() }
+                Lifecycle.Event.ON_START -> { active = true; view.onResume() }
+                Lifecycle.Event.ON_STOP -> { active = false; pausePending = false; view.resumeFrames(); wantPlaying = false; players.forEach { it.pause() }; view.onPause() }
                 else -> Unit
             }
         }
@@ -92,31 +105,87 @@ fun QuestOsmoVideo(sources: List<MediaSource>, calibration: PanoramaStereoCalibr
             players.forEachIndexed { index, player -> player.removeListener(listeners[index]); player.release() }
         }
     }
-    LaunchedEffect(players, wantPlaying, failed) {
+    LaunchedEffect(players, wantPlaying, failed, windowFocused) {
+        var selectionSince: Long? = null
+        var finalSince: Long? = null
+        var pauseSince: Long? = null
+        var lastCount = view.frameCount()
+        var progressAt = SystemClock.elapsedRealtime()
         while (true) {
             val first = players[0]; val second = players[1]
+            val now = SystemClock.elapsedRealtime()
+            if (!active || !windowFocused) {
+                selectionSince = null; finalSince = null; pauseSince = null; progressAt = now
+                delay(100); continue
+            }
+            if (pausePending) {
+                val started = pauseSince ?: now.also { pauseSince = it }
+                if (view.isFrozen() || now - started >= 3_000) {
+                    if (!view.isFrozen()) view.resumeFrames()
+                    pausePending = false; wantPlaying = false
+                }
+            } else pauseSince = null
             duration = first.duration.coerceAtLeast(0L)
             if (!seeking) position = first.currentPosition.coerceAtLeast(0L)
-            val prepared = selected.all { it } && players.all { it.playbackState == Player.STATE_READY }
-            val drift = abs(first.currentPosition - second.currentPosition)
-            if (prepared && drift > 150 && !seeking) second.seekTo(first.currentPosition)
-            syncReady = prepared && drift <= 150 && !seeking && !failed
+            val selectedBoth = selected.all { it }
+            if (wantPlaying && !failed && !seeking && !selectedBoth) {
+                val started = selectionSince ?: now.also { selectionSince = it }
+                if (now - started >= 15_000) failed = true
+            } else selectionSince = null
+            val endedCount = players.count { it.playbackState == Player.STATE_ENDED }
+            if (endedCount == 2 && view.isFrozen()) { view.resumeFrames(); pausePending = false }
+            val prepared = selectedBoth && players.all { it.playbackState == Player.STATE_READY || it.playbackState == Player.STATE_ENDED }
+            val drift = second.currentPosition - first.currentPosition
+            if (prepared && endedCount == 0) {
+                val speed = when { drift > 40 -> 0.95f; drift < -40 -> 1.05f; else -> 1f }
+                if (second.playbackParameters.speed != speed) second.setPlaybackSpeed(speed)
+            }
+            syncReady = selectedBoth && (prepared || endedCount > 0) && !seeking && !failed
             view.setFrameVisibility(syncReady)
-            if (!wantPlaying || !syncReady) players.forEach { if (it.playWhenReady) it.pause() }
-            else players.forEach { if (!it.playWhenReady) it.play() }
+            if (endedCount == 2 && !seeking && !failed) {
+                if (view.finalFramesPresented()) {
+                    ended = true; wantPlaying = false; finalSince = null
+                } else {
+                    val started = finalSince ?: now.also { finalSince = it }
+                    if (now - started >= 8_000) failed = true
+                }
+            } else finalSince = null
+            if (!wantPlaying || !selectedBoth || seeking || failed || (!prepared && endedCount == 0)) {
+                players.forEach { if (it.playWhenReady) it.pause() }
+            } else players.filter { it.playbackState != Player.STATE_ENDED }.forEach { if (!it.playWhenReady) it.play() }
+            val count = view.frameCount()
+            if (count != lastCount || !wantPlaying || (!prepared && endedCount == 0) || seeking || endedCount == 2) progressAt = now
+            else if (now - progressAt >= 8_000) failed = true
+            lastCount = count
             delay(100)
         }
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("OSV · 実験的な魚眼プレビュー", style = MaterialTheme.typography.titleLarge)
-        Text(if (calibration != null) "レンズ校正を適用中（実験的）。手ぶれ補正は未対応です。" else "レンズ・手ぶれ補正なし。映像のずれや継ぎ目が生じます。")
+        Text(if (calibration != null) "レンズ校正を適用中（実験的）。" else "レンズ校正が見つからないため、映像のずれや継ぎ目が生じます。")
         AndroidView(factory = { view }, modifier = Modifier.fillMaxWidth().weight(1f))
         if (failed) Text("OSVを再生できません。2つの4K HEVC映像を同時に扱えない場合があります。", color = MaterialTheme.colorScheme.error)
         Slider(value = position.toFloat().coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
             onValueChange = { seeking = true; position = it.toLong() },
-            onValueChangeFinished = { players.forEach { it.seekTo(position) }; seeking = false },
-            valueRange = 0f..duration.coerceAtLeast(1L).toFloat(), enabled = duration > 0 && !failed)
-        TextButton(onClick = { wantPlaying = !wantPlaying }, enabled = !failed) {
+            onValueChangeFinished = {
+                val target = position.coerceAtMost((duration - 100L).coerceAtLeast(0L))
+                ended = false; resettingSeek = true; pausePending = false
+                players.forEach { it.pause() }
+                view.setFrameVisibility(false)
+                view.resetForSeek { players.forEach { it.seekTo(target) }; seeking = false; resettingSeek = false }
+            },
+            valueRange = 0f..duration.coerceAtLeast(1L).toFloat(), enabled = duration > 0 && !failed && !resettingSeek && !pausePending)
+        TextButton(onClick = {
+            if (ended) {
+                ended = false; seeking = true; resettingSeek = true; position = 0L
+                view.setFrameVisibility(false)
+                view.resetForSeek { players.forEach { it.seekTo(0L) }; seeking = false; resettingSeek = false; wantPlaying = true }
+            } else if (wantPlaying) {
+                pausePending = true; view.freezeAtPair()
+            } else {
+                view.resumeFrames(); wantPlaying = true
+            }
+        }, enabled = !failed && !resettingSeek && !pausePending) {
             Text(if (wantPlaying) "一時停止" else "再生")
         }
     }
