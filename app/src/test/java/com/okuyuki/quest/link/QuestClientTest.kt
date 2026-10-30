@@ -85,6 +85,21 @@ class QuestClientTest {
             }
         }
     }
+    @Test fun `legacy phone video metadata falls back to v2`() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(MockResponse().setResponseCode(404))
+            server.enqueue(MockResponse().setBody("""{"id":"0123456789abcdef0123456789abcdef","sizeBytes":10}"""))
+            QuestClient(Endpoint(server.hostName, server.port), TemporaryPhotoCache(folder.newFolder())).use { client ->
+                client.token = "paired-token"
+                assertEquals(PanoramaVideoFormat.EQUIRECTANGULAR_MP4, client.panoramaVideo()!!.format)
+                assertEquals("/v3/panorama/video", server.takeRequest().path)
+                val legacy = server.takeRequest()
+                assertEquals("/v2/panorama/video", legacy.path)
+                assertEquals("Bearer paired-token", legacy.getHeader("Authorization"))
+            }
+        }
+    }
     @Test fun `raw video metadata is available without exposing it to legacy clients`() = runBlocking {
         MockWebServer().use { server ->
             server.start()
