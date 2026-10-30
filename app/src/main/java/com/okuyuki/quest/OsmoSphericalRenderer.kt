@@ -77,6 +77,9 @@ internal class OsmoSphericalRenderer(
             }
         }
     }
+    private val proxyRetry = Runnable {
+        if (!closed && !failed && visible) try { drawProxy() } catch (_: Throwable) { fail() }
+    }
     private val count = if (proxy) 1 else 2
     private val quad = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().apply {
         put(floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f)); position(0)
@@ -169,6 +172,11 @@ internal class OsmoSphericalRenderer(
         }
         if (!visible || !received[0]) return
         val matched = frameMatcher?.frame(requireNotNull(textures[0]).timestamp)
+        handler.removeCallbacks(proxyRetry)
+        if (stabilizationEnabled && matched?.waiting == true) {
+            handler.postDelayed(proxyRetry, 100)
+            return
+        }
         if (stabilizationEnabled && matched?.waiting != true && matched?.correction == null) {
             stabilizationEnabled = false
             main.post { if (!closed && !failed) onStabilizationUnavailable() }
@@ -251,6 +259,7 @@ internal class OsmoSphericalRenderer(
     fun close() { if (!closed) { closed = true; handler.post { cleanup() } } }
     private fun cleanup() {
         handler.removeCallbacks(watchdog)
+        handler.removeCallbacks(proxyRetry)
         repeat(count) { index -> surfaces[index]?.release(); surfaces[index] = null; textures[index]?.release(); textures[index] = null }
         if (display != EGL14.EGL_NO_DISPLAY) {
             if (program != 0) GLES20.glDeleteProgram(program)
