@@ -38,6 +38,7 @@ fun QuestApp(model: QuestViewModel) {
     var address by rememberSaveable { mutableStateOf("") }
     var addressError by remember { mutableStateOf(false) }
     var settings by rememberSaveable { mutableStateOf(false) }
+    var highResolution by rememberSaveable { mutableStateOf(false) }
     val theme = darkColorScheme(primary = Color.White, onPrimary = Color(0xFF10131C), background = Color(0xFF090A0F), surface = Color(0xFF232630), onSurface = Color.White, onSurfaceVariant = Color(0xFFB5B6BD))
     BackHandler(state.current != null || state.viewingPanorama || state.viewingVideo) {
         if (state.viewingVideo) model.closeVideo() else if (state.viewingPanorama) model.closePanorama() else model.backToLibrary()
@@ -85,9 +86,15 @@ fun QuestApp(model: QuestViewModel) {
                             }
                             if (state.videoStabilizationUnavailable) Text("映像フレームと姿勢を照合できないため、補正をオフにしました。")
                         }
+                        if (share?.format == PanoramaVideoFormat.OSMO_OSV) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = highResolution, onCheckedChange = { highResolution = it })
+                                Text("没入表示を高画質にする（実験的・動作が重くなる場合があります）")
+                            }
+                        }
                         if (share != null && !state.videoMotionLoading) {
                             OutlinedButton(onClick = {
-                                if (model.prepareImmersiveVideo()) {
+                                if (model.prepareImmersiveVideo(highResolution)) {
                                     try {
                                         context.startActivity(Intent(context, ImmersiveActivity::class.java).apply {
                                             action = Intent.ACTION_MAIN

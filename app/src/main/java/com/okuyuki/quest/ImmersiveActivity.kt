@@ -78,6 +78,8 @@ class ImmersiveActivity : AppSystemActivity() {
             finish()
         }, onStabilizationUnavailable = {
             Toast.makeText(this, "映像と姿勢の時刻を照合できないため、手ぶれ補正をオフにしました。", Toast.LENGTH_LONG).show()
+        }, onQualityFallback = {
+            Toast.makeText(this, "高画質で開始できないため、標準画質に切り替えました。", Toast.LENGTH_LONG).show()
         }).also { it.setFocused(focused) }
     }
     private suspend fun verifyShare(session: ImmersivePlayback.Connection) {

@@ -31,17 +31,25 @@ internal object OsmoProjectionSurface {
     external fun setBufferSize(surface: Surface, width: Int, height: Int): Boolean
 }
 
+/** Attempt the requested output size first and retain the proven-size fallback. */
+internal fun selectProjectionSize(highResolution: Boolean, create: (Int, Int) -> Boolean): Pair<Int, Int>? {
+    if (highResolution && create(4096, 2048)) return 4096 to 2048
+    return if (create(2048, 1024)) 2048 to 1024 else null
+}
+
 /** Converts raw Osmo fisheye frames into the equirectangular surface used by Spatial SDK. */
 internal class OsmoSphericalRenderer(
     private val output: Surface,
     private val proxy: Boolean,
     private val calibration: PanoramaStereoCalibration?,
     private val stabilization: OsmoStabilization?,
+    private val highResolution: Boolean,
     private val timestamps: Array<FrameTimestampMap>,
     private val onReady: (List<Surface>) -> Unit,
     private val onError: () -> Unit,
     private val onSynchronizationFailure: () -> Unit,
     private val onStabilizationUnavailable: () -> Unit,
+    private val onQualityFallback: () -> Unit,
 ) {
     private val main = Handler(Looper.getMainLooper())
     private val thread = HandlerThread("Osmo sphere GPU").apply { start() }
@@ -88,7 +96,7 @@ internal class OsmoSphericalRenderer(
     init { handler.post { try { initialize() } catch (_: Throwable) { fail() } } }
 
     private fun initialize() {
-        check(!closed && output.isValid && OsmoProjectionSurface.setBufferSize(output, 2048, 1024))
+        check(!closed && output.isValid)
         display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
         check(display != EGL14.EGL_NO_DISPLAY)
         val version = IntArray(2)
@@ -101,15 +109,13 @@ internal class OsmoSphericalRenderer(
         context = EGL14.eglCreateContext(display, configs[0], EGL14.EGL_NO_CONTEXT,
             intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, EGL14.EGL_NONE), 0)
         check(context != EGL14.EGL_NO_CONTEXT)
-        window = EGL14.eglCreateWindowSurface(display, configs[0], output, intArrayOf(EGL14.EGL_NONE), 0)
-        check(window != EGL14.EGL_NO_SURFACE && EGL14.eglMakeCurrent(display, window, window, context))
-        val width = IntArray(1); val height = IntArray(1)
-        check(EGL14.eglQuerySurface(display, window, EGL14.EGL_WIDTH, width, 0))
-        check(EGL14.eglQuerySurface(display, window, EGL14.EGL_HEIGHT, height, 0))
-        check(width[0] == 2048 && height[0] == 1024)
+        val size = checkNotNull(selectProjectionSize(highResolution && !proxy) { width, height ->
+            createOutputSurface(requireNotNull(configs[0]), width, height)
+        })
+        if (highResolution && !proxy && size.first < 4096) main.post { if (!closed && !failed) onQualityFallback() }
         check(GLES20.glGetString(GLES20.GL_EXTENSIONS)?.split(' ')?.contains("GL_OES_EGL_image_external") == true)
         program = linkProgram(VERTEX_SHADER, FRAGMENT_SHADER)
-        GLES20.glViewport(0, 0, width[0], height[0])
+        GLES20.glViewport(0, 0, size.first, size.second)
         GLES20.glGenTextures(count, ids, 0)
         repeat(count) { index ->
             GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, ids[index])
@@ -130,6 +136,29 @@ internal class OsmoSphericalRenderer(
             }
         }
         main.post { if (!closed && !failed) onReady((0 until count).map { requireNotNull(surfaces[it]) }) }
+    }
+
+    private fun createOutputSurface(config: EGLConfig, width: Int, height: Int): Boolean {
+        if (!OsmoProjectionSurface.setBufferSize(output, width, height)) return false
+        val candidate = EGL14.eglCreateWindowSurface(display, config, output, intArrayOf(EGL14.EGL_NONE), 0)
+        if (candidate == EGL14.EGL_NO_SURFACE) { EGL14.eglGetError(); return false }
+        val current = EGL14.eglMakeCurrent(display, candidate, candidate, context)
+        val actualWidth = IntArray(1); val actualHeight = IntArray(1); val viewport = IntArray(2)
+        val dimensions = current && EGL14.eglQuerySurface(display, candidate, EGL14.EGL_WIDTH, actualWidth, 0) &&
+            EGL14.eglQuerySurface(display, candidate, EGL14.EGL_HEIGHT, actualHeight, 0)
+        if (dimensions) GLES20.glGetIntegerv(GLES20.GL_MAX_VIEWPORT_DIMS, viewport, 0)
+        if (dimensions && actualWidth[0] == width && actualHeight[0] == height && viewport[0] >= width && viewport[1] >= height) {
+            GLES20.glViewport(0, 0, width, height)
+            GLES20.glClearColor(0f, 0f, 0f, 1f); GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+            if (GLES20.glGetError() == GLES20.GL_NO_ERROR && EGL14.eglSwapBuffers(display, candidate)) {
+                window = candidate
+                return true
+            }
+        }
+        EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
+        EGL14.eglDestroySurface(display, candidate)
+        EGL14.eglGetError()
+        return false
     }
 
     fun setVisible(value: Boolean) {

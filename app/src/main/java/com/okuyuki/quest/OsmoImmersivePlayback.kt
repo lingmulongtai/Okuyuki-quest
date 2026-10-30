@@ -30,6 +30,7 @@ internal class OsmoImmersivePlayback(
     private val onError: () -> Unit,
     private val onSynchronizationFailure: () -> Unit,
     private val onStabilizationUnavailable: () -> Unit,
+    private val onQualityFallback: () -> Unit,
 ) {
     private val proxy = session.share.format == PanoramaVideoFormat.OSMO_LRF
     private val count = if (proxy) 1 else 2
@@ -46,7 +47,7 @@ internal class OsmoImmersivePlayback(
         timestamps[index].record(releaseNs, pts)
     } }
     private val renderer = OsmoSphericalRenderer(output, proxy, session.share.calibration,
-        session.stabilization, timestamps, ::prepare, ::fail, ::syncFailure, onStabilizationUnavailable)
+        session.stabilization, session.highResolution, timestamps, ::prepare, ::fail, ::syncFailure, onStabilizationUnavailable, onQualityFallback)
 
     private fun prepare(surfaces: List<Surface>) {
         if (closed) return

@@ -209,7 +209,7 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
             else state.copy(videoStabilizationEnabled = false, videoStabilizationUnavailable = true)
         }
     }
-    fun prepareImmersiveVideo(): Boolean {
+    fun prepareImmersiveVideo(highResolution: Boolean = false): Boolean {
         val current = _state.value
         val share = current.sharedVideo ?: return false
         val existing = client ?: return false
@@ -217,7 +217,8 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         if (!current.connected || !current.viewingVideo || current.videoMotionLoading) return false
         val connection = QuestClient(existing.endpoint, cache).apply { this.token = token }
         val stabilization = current.videoMotion.takeIf { current.videoStabilizationEnabled }
-        ImmersivePlayback.install(ImmersivePlayback.Connection(connection, share, stabilization))
+        ImmersivePlayback.install(ImmersivePlayback.Connection(connection, share, stabilization,
+            highResolution && share.format == PanoramaVideoFormat.OSMO_OSV))
         return true
     }
     fun closeVideo() {
