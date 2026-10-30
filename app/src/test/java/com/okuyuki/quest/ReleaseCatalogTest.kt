@@ -18,4 +18,18 @@ class ReleaseCatalogTest {
         assertNull(ReleaseCatalog.find("[$bad]", "0.1.0-alpha.9-preview", "quest"))
         assertEquals("0.1.0", ReleaseCatalog.find("[${release("v0.1.0")}]", "0.1.0-alpha.9-preview", "quest")?.version)
     }
+    @Test fun findsPublishedPreviewInPublicFeedAndChecksItsExactAsset() {
+        val feed = """<feed xmlns="http://www.w3.org/2005/Atom"><id>tag:github.com,2008:https://github.com/lingmulongtai/Okuyuki-quest/releases</id><entry><link rel="alternate" href="https://github.com/lingmulongtai/Okuyuki-quest/releases/tag/v0.1.0-alpha.12-preview"/></entry>
+            <entry><link href="https://evil.example/releases/tag/v9.0.0"/></entry></feed>"""
+        val tag = ReleaseCatalog.latestFeedTag(feed, "0.1.0-alpha.11-preview", "quest")
+        assertEquals("v0.1.0-alpha.12-preview", tag)
+        val digest = "b".repeat(64)
+        val release = ReleaseCatalog.fromChecksums(tag!!, "$digest  Okuyuki-quest-$tag.apk\n", "quest")
+        assertEquals(digest, release?.digest)
+        assertEquals(0L, release?.size)
+        assertNull(ReleaseCatalog.fromChecksums(tag, "$digest  other.apk\n", "quest"))
+        assertNull(ReleaseCatalog.fromChecksums(tag, "$digest  Okuyuki-quest-$tag.apk\n$digest  Okuyuki-quest-$tag.apk\n", "quest"))
+        assertNull(ReleaseCatalog.latestFeedTag(feed, "0.1.0-alpha.12-preview", "quest"))
+        assertThrows(IllegalArgumentException::class.java) { ReleaseCatalog.latestFeedTag("not a feed", "0.1.0-alpha.11-preview", "quest") }
+    }
 }

@@ -18,6 +18,32 @@ internal object ReleaseCatalog {
         for (i in a.indices) if (a[i] != b[i]) return a[i] > b[i]
         return false
     }
+    /** The public Atom feed remains available when the unauthenticated REST quota is exhausted. */
+    fun latestFeedTag(feed: String, current: String, repo: String): String? {
+        require(feed.contains("<feed ") && feed.contains("<id>tag:github.com,2008:https://github.com/lingmulongtai/Okuyuki-$repo/releases</id>"))
+        var best = version(current) ?: return null
+        var result: String? = null
+        val prefix = Regex.escape("https://github.com/lingmulongtai/Okuyuki-$repo/releases/tag/")
+        val link = Regex("<link\\s+[^>]*href=\"" + prefix + "(v[0-9A-Za-z.\\-]+)\"[^>]*/?>")
+        for (match in link.findAll(feed)) {
+            val tag = match.groupValues[1]
+            val candidate = version(tag) ?: continue
+            if (newer(candidate, best)) { best = candidate; result = tag }
+        }
+        return result
+    }
+
+    fun fromChecksums(tag: String, checksums: String, repo: String): UpdateRelease? {
+        if (version(tag) == null || !tag.startsWith("v")) return null
+        val name = "Okuyuki-$repo-$tag.apk"
+        val lines = checksums.lineSequence().mapNotNull { line ->
+            val match = Regex("^([0-9a-fA-F]{64})  \\*?(.+)$").matchEntire(line.trimEnd()) ?: return@mapNotNull null
+            if (match.groupValues[2] == name) match.groupValues[1].lowercase() else null
+        }.toList()
+        if (lines.size != 1) return null
+        return UpdateRelease(tag.removePrefix("v"), "https://github.com/lingmulongtai/Okuyuki-$repo/releases/download/$tag/$name", lines.single(), 0)
+    }
+
     fun find(json: String, current: String, repo: String): UpdateRelease? {
         val installed = version(current) ?: return null
         var best = installed
