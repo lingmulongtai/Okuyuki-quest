@@ -11,10 +11,15 @@ import android.opengl.GLES20
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.os.SystemClock
 import android.view.Surface
 import com.okuyuki.protocol.FrameCorrectionMatcher
 import com.okuyuki.protocol.FrameTimestampMap
+import com.okuyuki.protocol.FrameTimestampToken
 import com.okuyuki.protocol.OsmoStabilization
+import com.okuyuki.protocol.OsmoDecodedFrame
+import com.okuyuki.protocol.OsmoFramePairer
+import com.okuyuki.protocol.OsmoPairAction
 import com.okuyuki.protocol.PanoramaLensCalibration
 import com.okuyuki.protocol.PanoramaStereoCalibration
 import java.nio.ByteBuffer
@@ -32,9 +37,10 @@ internal class OsmoSphericalRenderer(
     private val proxy: Boolean,
     private val calibration: PanoramaStereoCalibration?,
     private val stabilization: OsmoStabilization?,
-    private val timestamps: FrameTimestampMap,
+    private val timestamps: Array<FrameTimestampMap>,
     private val onReady: (List<Surface>) -> Unit,
     private val onError: () -> Unit,
+    private val onSynchronizationFailure: () -> Unit,
     private val onStabilizationUnavailable: () -> Unit,
 ) {
     private val main = Handler(Looper.getMainLooper())
@@ -54,7 +60,23 @@ internal class OsmoSphericalRenderer(
     private val received = BooleanArray(2)
     private var visible = false
     private var stabilizationEnabled = stabilization != null
-    private val frameMatcher = stabilization?.let { FrameCorrectionMatcher(timestamps, it) }
+    private val frameMatcher = if (proxy) stabilization?.let { FrameCorrectionMatcher(timestamps[0], it) } else null
+    private val pairer = if (proxy) null else OsmoFramePairer().apply { reset() }
+    private var pendingPresentation: OsmoPairAction.Present? = null
+    private var lastPairAtMs = 0L
+    private var expectFrames = true
+    private var drained = false
+    private var endingTokens: List<FrameTimestampToken>? = null
+    private val lastLatched = LongArray(2) { Long.MIN_VALUE }
+    private var lastPresentedPts: Long? = null
+    private val watchdog = object : Runnable {
+        override fun run() {
+            if (!closed && !failed && visible && !proxy && expectFrames) {
+                if (SystemClock.elapsedRealtime() - lastPairAtMs >= 5000L) { fail(synchronization = true); return }
+                handler.postDelayed(this, 500)
+            }
+        }
+    }
     private val count = if (proxy) 1 else 2
     private val quad = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().apply {
         put(floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f)); position(0)
@@ -94,7 +116,12 @@ internal class OsmoSphericalRenderer(
             GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
             textures[index] = SurfaceTexture(ids[index]).also { texture ->
                 texture.setOnFrameAvailableListener({
-                    if (!closed) { pending[index] = true; try { draw() } catch (_: Throwable) { fail() } }
+                    if (!closed) {
+                        try {
+                            if (proxy) { pending[index] = true; drawProxy() }
+                            else { pairer!!.frameAvailable(index, pairer.generation()); pumpPairs() }
+                        } catch (_: Throwable) { fail() }
+                    }
                 }, handler)
                 surfaces[index] = Surface(texture)
             }
@@ -104,55 +131,121 @@ internal class OsmoSphericalRenderer(
 
     fun setVisible(value: Boolean) {
         handler.post {
-            if (!closed && visible != value) { visible = value; try { draw() } catch (_: Throwable) { fail() } }
+            if (!closed && visible != value) {
+                visible = value
+                handler.removeCallbacks(watchdog)
+                if (visible) {
+                    lastPairAtMs = SystemClock.elapsedRealtime(); expectFrames = !drained
+                    if (!proxy && expectFrames) handler.postDelayed(watchdog, 500)
+                    try { if (proxy) drawProxy() else pumpPairs() } catch (_: Throwable) { fail() }
+                }
+            }
         }
     }
 
-    private fun draw() {
-        repeat(count) { index ->
-            if (pending[index]) {
-                val frame = requireNotNull(textures[index]); frame.updateTexImage(); frame.getTransformMatrix(matrices[index])
-                pending[index] = false; received[index] = true
+    /** Called after both decoders end; late SurfaceTexture callbacks still have to drain. */
+    fun finishWhenEnded(tokens: List<FrameTimestampToken?>) {
+        handler.post {
+            if (closed || failed) return@post
+            if (proxy) { drained = true; expectFrames = false; handler.removeCallbacks(watchdog); return@post }
+            if (tokens.size != 2 || tokens.any { it?.presentationUs == null } ||
+                tokens[0]?.presentationUs != tokens[1]?.presentationUs) { fail(synchronization = true); return@post }
+            endingTokens = tokens.filterNotNull()
+            lastPairAtMs = SystemClock.elapsedRealtime()
+            checkDrainComplete()
+        }
+    }
+    private fun checkDrainComplete() {
+        val final = endingTokens ?: return
+        if (lastPresentedPts == final[0].presentationUs && lastLatched[0] == final[0].releaseNs && lastLatched[1] == final[1].releaseNs) {
+            drained = true; expectFrames = false; handler.removeCallbacks(watchdog)
+        }
+    }
+
+    private fun drawProxy() {
+        if (pending[0]) {
+            val frame = requireNotNull(textures[0]); frame.updateTexImage(); frame.getTransformMatrix(matrices[0])
+            pending[0] = false; received[0] = true
+        }
+        if (!visible || !received[0]) return
+        val matched = frameMatcher?.frame(requireNotNull(textures[0]).timestamp)
+        if (stabilizationEnabled && matched?.waiting != true && matched?.correction == null) {
+            stabilizationEnabled = false
+            main.post { if (!closed && !failed) onStabilizationUnavailable() }
+        }
+        drawFrame(if (stabilizationEnabled) matched?.correction else null)
+    }
+
+    private fun pumpPairs() {
+        val coordinator = requireNotNull(pairer)
+        repeat(16) {
+            val pendingPair = pendingPresentation
+            if (pendingPair != null) {
+                if (!visible) return
+                drawFrame(null)
+                coordinator.presented(pendingPair.presentationTimeUs, pendingPair.generation)
+                pendingPresentation = null
+                lastPresentedPts = pendingPair.presentationTimeUs
+                lastPairAtMs = SystemClock.elapsedRealtime()
+                checkDrainComplete()
+            }
+            when (val action = coordinator.next()) {
+                is OsmoPairAction.Latch -> {
+                    val frame = requireNotNull(textures[action.side])
+                    frame.updateTexImage(); frame.getTransformMatrix(matrices[action.side])
+                    val pts = timestamps[action.side].lookup(frame.timestamp)
+                    if (pts == null) coordinator.discarded(action.side, action.generation)
+                    else {
+                        coordinator.latched(action.side, action.generation, OsmoDecodedFrame(frame.timestamp, pts))
+                        lastLatched[action.side] = frame.timestamp
+                    }
+                }
+                is OsmoPairAction.Present -> pendingPresentation = action
+                OsmoPairAction.Wait, OsmoPairAction.Ended -> return
+                OsmoPairAction.Invalid -> { fail(synchronization = true); return }
             }
         }
+        handler.post { if (!closed && !failed) try { pumpPairs() } catch (_: Throwable) { fail() } }
+    }
+
+    private fun drawFrame(correction: FloatArray?) {
         GLES20.glClearColor(0f, 0f, 0f, 1f); GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-        if (visible && (0 until count).all { received[it] }) {
-            GLES20.glUseProgram(program)
-            val position = GLES20.glGetAttribLocation(program, "position")
-            GLES20.glEnableVertexAttribArray(position)
-            GLES20.glVertexAttribPointer(position, 2, GLES20.GL_FLOAT, false, 0, quad)
-            val matched = if (proxy) frameMatcher?.frame(requireNotNull(textures[0]).timestamp) else null
-            if (stabilizationEnabled && matched?.waiting != true && matched?.correction == null) {
-                stabilizationEnabled = false
-                main.post { if (!closed && !failed) onStabilizationUnavailable() }
-            }
-            val correction = if (stabilizationEnabled) matched?.correction else null
-            GLES20.glUniform4fv(GLES20.glGetUniformLocation(program, "motion"), 1, correction ?: floatArrayOf(1f, 0f, 0f, 0f), 0)
-            GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "proxy"), if (proxy) 1f else 0f)
-            GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "calibrated"), if (calibration == null) 0f else 1f)
-            fun setLens(prefix: String, lens: PanoramaLensCalibration) {
-                GLES20.glUniform4fv(GLES20.glGetUniformLocation(program, prefix + "Intrinsics"), 1, lens.intrinsics.map { it / 3840f }.toFloatArray(), 0)
-                GLES20.glUniform4fv(GLES20.glGetUniformLocation(program, prefix + "Distortion"), 1, lens.distortion.toFloatArray(), 0)
-                GLES20.glUniform1f(GLES20.glGetUniformLocation(program, prefix + "K5"), lens.distortion[4])
-                GLES20.glUniform4fv(GLES20.glGetUniformLocation(program, prefix + "Quaternion"), 1, lens.quaternion.toFloatArray(), 0)
-            }
-            calibration?.let { setLens("left", it.left); setLens("right", it.right) }
-            repeat(2) { index ->
-                val source = if (proxy) 0 else index
-                GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(program, "texMatrix$index"), 1, false, matrices[source], 0)
-                GLES20.glActiveTexture(GLES20.GL_TEXTURE0 + index)
-                GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, ids[source])
-                GLES20.glUniform1i(GLES20.glGetUniformLocation(program, "video$index"), index)
-            }
-            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
-            GLES20.glDisableVertexAttribArray(position)
+        GLES20.glUseProgram(program)
+        val position = GLES20.glGetAttribLocation(program, "position")
+        GLES20.glEnableVertexAttribArray(position)
+        GLES20.glVertexAttribPointer(position, 2, GLES20.GL_FLOAT, false, 0, quad)
+        GLES20.glUniform4fv(GLES20.glGetUniformLocation(program, "motion"), 1, correction ?: floatArrayOf(1f, 0f, 0f, 0f), 0)
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "proxy"), if (proxy) 1f else 0f)
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "calibrated"), if (calibration == null) 0f else 1f)
+        fun setLens(prefix: String, lens: PanoramaLensCalibration) {
+            GLES20.glUniform4fv(GLES20.glGetUniformLocation(program, prefix + "Intrinsics"), 1, lens.intrinsics.map { it / 3840f }.toFloatArray(), 0)
+            GLES20.glUniform4fv(GLES20.glGetUniformLocation(program, prefix + "Distortion"), 1, lens.distortion.toFloatArray(), 0)
+            GLES20.glUniform1f(GLES20.glGetUniformLocation(program, prefix + "K5"), lens.distortion[4])
+            GLES20.glUniform4fv(GLES20.glGetUniformLocation(program, prefix + "Quaternion"), 1, lens.quaternion.toFloatArray(), 0)
         }
+        calibration?.let { setLens("left", it.left); setLens("right", it.right) }
+        repeat(2) { index ->
+            val source = if (proxy) 0 else index
+            GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(program, "texMatrix$index"), 1, false, matrices[source], 0)
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0 + index)
+            GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, ids[source])
+            GLES20.glUniform1i(GLES20.glGetUniformLocation(program, "video$index"), index)
+        }
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+        GLES20.glDisableVertexAttribArray(position)
         check(EGL14.eglSwapBuffers(display, window))
     }
 
-    private fun fail() { if (!closed && !failed) { failed = true; main.post { if (!closed) onError() }; cleanup() } }
+    private fun fail(synchronization: Boolean = false) {
+        if (!closed && !failed) {
+            failed = true
+            main.post { if (!closed) { if (synchronization) onSynchronizationFailure() else onError() } }
+            cleanup()
+        }
+    }
     fun close() { if (!closed) { closed = true; handler.post { cleanup() } } }
     private fun cleanup() {
+        handler.removeCallbacks(watchdog)
         repeat(count) { index -> surfaces[index]?.release(); surfaces[index] = null; textures[index]?.release(); textures[index] = null }
         if (display != EGL14.EGL_NO_DISPLAY) {
             if (program != 0) GLES20.glDeleteProgram(program)
