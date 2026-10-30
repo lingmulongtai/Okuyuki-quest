@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.okuyuki.protocol.Photo
+import com.okuyuki.protocol.PanoramaVideoFormat
 import com.okuyuki.quest.link.Endpoint
 import com.okuyuki.quest.window.StereoPhotoView
 import java.text.SimpleDateFormat
@@ -66,8 +67,13 @@ fun QuestApp(model: QuestViewModel) {
                     state.viewingVideo -> {
                         TextButton(onClick = model::closeVideo) { Text("一覧に戻る") }
                         Text("360°動画 · ウィンドウ内プレビュー")
-                        val source = remember(state.sharedVideo) { model.videoSource() }
-                        source?.let { QuestPanoramaVideo(it, Modifier.weight(1f).fillMaxWidth()) }
+                        val share = state.sharedVideo
+                        val sources = remember(share) { listOfNotNull(model.videoSource(), model.videoSource()) }
+                        if (sources.size == 2) when (share?.format) {
+                            PanoramaVideoFormat.OSMO_LRF -> QuestOsmoProxy(sources[0], Modifier.weight(1f).fillMaxWidth())
+                            PanoramaVideoFormat.OSMO_OSV -> QuestOsmoVideo(sources, Modifier.weight(1f).fillMaxWidth())
+                            else -> QuestPanoramaVideo(sources[0], Modifier.weight(1f).fillMaxWidth())
+                        }
                     }
                     state.viewingPanorama -> {
                         TextButton(onClick = model::closePanorama) { Text("一覧に戻る") }
