@@ -75,16 +75,16 @@ fun QuestOsmoProxy(source: MediaSource, calibration: PanoramaStereoCalibration?,
         }
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("LRF · 実験的な魚眼プレビュー", style = MaterialTheme.typography.titleLarge)
-        Text(if (calibration != null) "レンズ校正を適用中（実験的）。" else "近似表示です。映像のずれや継ぎ目が生じます。")
         AndroidView(factory = { view }, modifier = Modifier.fillMaxWidth().weight(1f))
         if (failed) Text("LRFを再生できません。通信状態と対応形式を確認してください。", color = MaterialTheme.colorScheme.error)
-        Slider(value = position.toFloat().coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
-            onValueChange = { seeking = true; position = it.toLong() },
-            onValueChangeFinished = { view.resetStabilizationClock(); player.seekTo(position); seeking = false },
-            valueRange = 0f..duration.coerceAtLeast(1L).toFloat(), enabled = duration > 0 && !failed)
-        TextButton(onClick = { if (playing) player.pause() else player.play() }, enabled = !failed) {
-            Text(if (playing) "一時停止" else "再生")
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Slider(value = position.toFloat().coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
+                onValueChange = { seeking = true; position = it.toLong() },
+                onValueChangeFinished = { view.resetStabilizationClock(); player.seekTo(position); seeking = false },
+                valueRange = 0f..duration.coerceAtLeast(1L).toFloat(), enabled = duration > 0 && !failed, modifier = Modifier.weight(1f))
+            TextButton(onClick = { if (playing) player.pause() else player.play() }, enabled = !failed) {
+                Text(if (playing) "一時停止" else "再生")
+            }
         }
     }
 }

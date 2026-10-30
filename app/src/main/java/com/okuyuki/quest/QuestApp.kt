@@ -91,6 +91,10 @@ fun QuestApp(model: QuestViewModel) {
                             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 TextButton(onClick = model::closeVideo) { Text("一覧に戻る") }
                                 Text("360°動画 · ウィンドウ内プレビュー")
+                                if (share?.format == PanoramaVideoFormat.OSMO_LRF || share?.format == PanoramaVideoFormat.OSMO_OSV) {
+                                    Text(if (share.format == PanoramaVideoFormat.OSMO_LRF) "LRF · 実験的な魚眼プレビュー" else "OSV · 実験的な魚眼プレビュー", style = MaterialTheme.typography.titleMedium)
+                                    Text(if (share.calibration != null) "レンズ校正を適用中（実験的）。" else "近似表示です。映像のずれや継ぎ目が生じます。")
+                                }
                                 if (state.videoMotionLoading) {
                                     LinearProgressIndicator(Modifier.fillMaxWidth())
                                     Text("スマホから姿勢情報を確認しています…")

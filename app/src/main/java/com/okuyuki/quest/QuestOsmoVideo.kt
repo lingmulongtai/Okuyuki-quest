@@ -161,32 +161,32 @@ fun QuestOsmoVideo(sources: List<MediaSource>, calibration: PanoramaStereoCalibr
         }
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("OSV · 実験的な魚眼プレビュー", style = MaterialTheme.typography.titleLarge)
-        Text(if (calibration != null) "レンズ校正を適用中（実験的）。" else "レンズ校正が見つからないため、映像のずれや継ぎ目が生じます。")
         AndroidView(factory = { view }, modifier = Modifier.fillMaxWidth().weight(1f))
         if (failed) Text("OSVを再生できません。2つの4K HEVC映像を同時に扱えない場合があります。", color = MaterialTheme.colorScheme.error)
-        Slider(value = position.toFloat().coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
-            onValueChange = { seeking = true; position = it.toLong() },
-            onValueChangeFinished = {
-                val target = position.coerceAtMost((duration - 100L).coerceAtLeast(0L))
-                ended = false; resettingSeek = true; pausePending = false
-                players.forEach { it.pause() }
-                view.setFrameVisibility(false)
-                view.resetForSeek { players.forEach { it.seekTo(target) }; seeking = false; resettingSeek = false }
-            },
-            valueRange = 0f..duration.coerceAtLeast(1L).toFloat(), enabled = duration > 0 && !failed && !resettingSeek && !pausePending)
-        TextButton(onClick = {
-            if (ended) {
-                ended = false; seeking = true; resettingSeek = true; position = 0L
-                view.setFrameVisibility(false)
-                view.resetForSeek { players.forEach { it.seekTo(0L) }; seeking = false; resettingSeek = false; wantPlaying = true }
-            } else if (wantPlaying) {
-                pausePending = true; view.freezeAtPair()
-            } else {
-                view.resumeFrames(); wantPlaying = true
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Slider(value = position.toFloat().coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
+                onValueChange = { seeking = true; position = it.toLong() },
+                onValueChangeFinished = {
+                    val target = position.coerceAtMost((duration - 100L).coerceAtLeast(0L))
+                    ended = false; resettingSeek = true; pausePending = false
+                    players.forEach { it.pause() }
+                    view.setFrameVisibility(false)
+                    view.resetForSeek { players.forEach { it.seekTo(target) }; seeking = false; resettingSeek = false }
+                },
+                valueRange = 0f..duration.coerceAtLeast(1L).toFloat(), enabled = duration > 0 && !failed && !resettingSeek && !pausePending, modifier = Modifier.weight(1f))
+            TextButton(onClick = {
+                if (ended) {
+                    ended = false; seeking = true; resettingSeek = true; position = 0L
+                    view.setFrameVisibility(false)
+                    view.resetForSeek { players.forEach { it.seekTo(0L) }; seeking = false; resettingSeek = false; wantPlaying = true }
+                } else if (wantPlaying) {
+                    pausePending = true; view.freezeAtPair()
+                } else {
+                    view.resumeFrames(); wantPlaying = true
+                }
+            }, enabled = !failed && !resettingSeek && !pausePending) {
+                Text(if (wantPlaying) "一時停止" else "再生")
             }
-        }, enabled = !failed && !resettingSeek && !pausePending) {
-            Text(if (wantPlaying) "一時停止" else "再生")
         }
     }
 }
