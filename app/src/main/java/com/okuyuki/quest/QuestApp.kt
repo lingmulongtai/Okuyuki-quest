@@ -32,6 +32,7 @@ import java.util.Locale
 @Composable
 fun QuestApp(model: QuestViewModel) {
     val context = LocalContext.current
+    val updater = rememberAppUpdates()
     val state by model.state.collectAsStateWithLifecycle()
     val nearby by model.discovery.phones.collectAsStateWithLifecycle()
     val discoveryError by model.discovery.error.collectAsStateWithLifecycle()
@@ -61,6 +62,7 @@ fun QuestApp(model: QuestViewModel) {
                         Text("使用量 ${state.cacheBytes / 1024 / 1024} MB · 上限 1 GB")
                         Text("写真はQuestに残しません。終了時と次の起動時に一時保存を消します。")
                         Text("Okuyuki ${BuildConfig.VERSION_NAME}")
+                        UpdateSettings(updater)
                         Text("立体表示にはMeta VR OS SDK 207以降が必要です。通常Androidでは平面プレビューになります。")
                         Text("実機検証は未完了です。左右の見え方を確認し、違和感があれば使用を中止してください。")
                         Text("HEICの読み取りにlibheifとlibde265を使用しています（LGPL）。ライセンスと対応ソースはGitHubのリリースに同梱しています。")
@@ -170,6 +172,7 @@ fun QuestApp(model: QuestViewModel) {
                 }
             }
         }
+        UpdatePrompt(updater)
     }
 }
 

@@ -1,12 +1,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:metavr="http://schemas.meta.com/metavr-sdk">
 <uses-feature android:name="android.hardware.vr.headtracking" android:required="false"/>
 <uses-permission android:name="android.permission.INTERNET"/>
+<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
 <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
 <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
 <metavr:uses-metavr-sdk metavr:minSdkVersion="207" metavr:targetSdkVersion="207"/>
 <application android:label="Okuyuki Quest" android:icon="@drawable/ic_launcher"
     android:allowBackup="false" android:supportsRtl="true" android:usesCleartextTraffic="true" android:theme="@android:style/Theme.Material.NoActionBar">
+    <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.updates"
+        android:exported="false" android:grantUriPermissions="true">
+        <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/update_paths"/>
+    </provider>
     <uses-native-library android:name="libossdk.oculus.so" android:required="false"/>
     <meta-data android:name="com.oculus.vr.focusaware" android:value="true"/>
     <meta-data android:name="com.oculus.supportedDevices" android:value="quest3|quest3s"/>
