@@ -3,6 +3,10 @@ package com.okuyuki.quest.link
 import com.okuyuki.protocol.Photo
 import com.okuyuki.protocol.PanoramaPhotoShare
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okio.Buffer
@@ -13,6 +17,18 @@ import org.junit.rules.TemporaryFolder
 
 class QuestClientTest {
     @get:Rule val folder = TemporaryFolder()
+    @Test fun `cancel a panorama metadata request while the body is stalled`() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(MockResponse().setBody("{}").setBodyDelay(5, java.util.concurrent.TimeUnit.SECONDS))
+            QuestClient(Endpoint(server.hostName, server.port), TemporaryPhotoCache(folder.newFolder())).use { client ->
+                val task = launch { client.panoramaPhoto() }
+                delay(200)
+                withTimeout(2000) { task.cancelAndJoin() }
+                assertTrue(task.isCancelled)
+            }
+        }
+    }
     @Test fun `panorama photo uses bearer authentication and rejects invalid or truncated data`() = runBlocking {
         MockWebServer().use { server ->
             server.start()
