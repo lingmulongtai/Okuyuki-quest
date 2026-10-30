@@ -73,7 +73,7 @@ fun QuestApp(model: QuestViewModel) {
                         TextButton(onClick = model::closeVideo) { Text("一覧に戻る") }
                         Text("360°動画 · ウィンドウ内プレビュー")
                         val share = state.sharedVideo
-                        if (share?.format == PanoramaVideoFormat.EQUIRECTANGULAR_MP4) {
+                        if (share != null) {
                             OutlinedButton(onClick = {
                                 if (model.prepareImmersiveVideo()) {
                                     try {

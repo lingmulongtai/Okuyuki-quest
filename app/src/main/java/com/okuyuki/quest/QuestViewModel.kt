@@ -163,7 +163,7 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         val share = current.sharedVideo ?: return false
         val existing = client ?: return false
         val token = existing.token ?: return false
-        if (!current.connected || !current.viewingVideo || share.format != PanoramaVideoFormat.EQUIRECTANGULAR_MP4) return false
+        if (!current.connected || !current.viewingVideo) return false
         val connection = QuestClient(existing.endpoint, cache).apply { this.token = token }
         ImmersivePlayback.install(ImmersivePlayback.Connection(connection, share))
         return true
