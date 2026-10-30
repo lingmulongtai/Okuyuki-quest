@@ -6,6 +6,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ProtocolTest {
+    @Test fun `panorama shares require opaque ids and bounded nonempty images`() {
+        val valid = PanoramaPhotoShare("0123456789abcdef0123456789abcdef", Protocol.MAX_PANORAMA_PHOTO_BYTES)
+        assertTrue(valid.isValid())
+        assertEquals(valid, Protocol.json.decodeFromString<PanoramaPhotoShare>(Protocol.json.encodeToString(valid)))
+        assertFalse(valid.copy(id = "../1").isValid())
+        assertFalse(valid.copy(id = "A".repeat(32)).isValid())
+        assertFalse(valid.copy(sizeBytes = 0).isValid())
+        assertFalse(valid.copy(sizeBytes = Protocol.MAX_PANORAMA_PHOTO_BYTES + 1).isValid())
+    }
     @Test fun `resume and suffix ranges are bounded to the source`() {
         assertEquals(ByteRange(4, 9), ByteRange.parse("bytes=4-", 10))
         assertEquals(ByteRange(8, 9), ByteRange.parse("bytes=-2", 10))

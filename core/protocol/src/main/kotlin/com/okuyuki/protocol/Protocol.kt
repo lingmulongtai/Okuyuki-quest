@@ -8,6 +8,7 @@ object Protocol {
     const val SERVICE_TYPE = "_okuyuki._tcp."
     const val PAGE_SIZE = 48
     const val MAX_ORIGINAL_BYTES = 256L * 1024 * 1024
+    const val MAX_PANORAMA_PHOTO_BYTES = 64L * 1024 * 1024
     val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 }
 
@@ -32,6 +33,12 @@ data class Photo(
 
 @Serializable
 data class LibraryPage(val items: List<Photo>, val next: String? = null)
+
+/** One explicitly shared panoramic image, isolated from the v1 stereo library. */
+@Serializable
+data class PanoramaPhotoShare(val id: String, val sizeBytes: Long) {
+    fun isValid(): Boolean = id.matches(Regex("[0-9a-f]{32}")) && sizeBytes in 1..Protocol.MAX_PANORAMA_PHOTO_BYTES
+}
 
 @Serializable
 data class PairRequest(val clientId: String, val clientName: String, val requestId: String? = null)
