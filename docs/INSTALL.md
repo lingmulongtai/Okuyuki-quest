@@ -1,6 +1,6 @@
 # GalaxyとQuest 3Sへのインストール・接続
 
-`v0.1.0-alpha.1` の手順です。GalaxyにAndroid版、Quest 3SにQuest版のAPKを入れます。
+`v0.1.0-alpha.12-preview` の手順です。GalaxyにAndroid版、Quest 3SにQuest版のAPKを入れます。
 Quest版はPCからUSB経由でインストールします。導入後はGalaxyとQuestだけで使えます。
 
 ## 用意するもの
@@ -18,10 +18,10 @@ Quest版はPCからUSB経由でインストールします。導入後はGalaxy�
 
 | 入れる端末 | 保存する場所 | APK |
 | --- | --- | --- |
-| Galaxy | Galaxyのダウンロードフォルダ | [Okuyuki-android-v0.1.0-alpha.1.apk](https://github.com/lingmulongtai/Okuyuki-android/releases/download/v0.1.0-alpha.1/Okuyuki-android-v0.1.0-alpha.1.apk) |
-| Quest 3S | **PCのダウンロードフォルダ** | [Okuyuki-quest-v0.1.0-alpha.1.apk](https://github.com/lingmulongtai/Okuyuki-quest/releases/download/v0.1.0-alpha.1/Okuyuki-quest-v0.1.0-alpha.1.apk) |
+| Galaxy | Galaxyのダウンロードフォルダ | [Okuyuki-android-v0.1.0-alpha.12-preview.apk](https://github.com/lingmulongtai/Okuyuki-android/releases/download/v0.1.0-alpha.12-preview/Okuyuki-android-v0.1.0-alpha.12-preview.apk) |
+| Quest 3S | **PCのダウンロードフォルダ** | [Okuyuki-quest-v0.1.0-alpha.12-preview.apk](https://github.com/lingmulongtai/Okuyuki-quest/releases/download/v0.1.0-alpha.12-preview/Okuyuki-quest-v0.1.0-alpha.12-preview.apk) |
 
-[Androidのリリース](https://github.com/lingmulongtai/Okuyuki-android/releases/tag/v0.1.0-alpha.1)・[Questのリリース](https://github.com/lingmulongtai/Okuyuki-quest/releases/tag/v0.1.0-alpha.1)にはチェックサム、署名情報、検証記録もあります。
+[Androidのリリース](https://github.com/lingmulongtai/Okuyuki-android/releases/tag/v0.1.0-alpha.12-preview)・[Questのリリース](https://github.com/lingmulongtai/Okuyuki-quest/releases/tag/v0.1.0-alpha.12-preview)にはチェックサム、署名情報、検証記録もあります。
 GitHubの「Source code」のZIPではなく、上の `.apk` を保存してください。
 
 ## 2. GalaxyにAndroid版を入れる
@@ -75,7 +75,7 @@ Questの行の状態が `device` になっていることを確認します。`u
 **同じPowerShell** で、`QUEST_SERIAL` を `devices -l` に表示されたQuestのシリアル番号に置き換えて実行します。`-s` でQuestを選ぶため、Galaxyなど別の端末が接続されていても対象を指定できます。
 
 ```powershell
-& $adb -s "QUEST_SERIAL" install -r "$env:USERPROFILE\Downloads\Okuyuki-quest-v0.1.0-alpha.1.apk"
+& $adb -s "QUEST_SERIAL" install -r "$env:USERPROFILE\Downloads\Okuyuki-quest-v0.1.0-alpha.12-preview.apk"
 ```
 
 `Success` と出たら完了です。保存先やファイル名が異なる場合は最後のパスを変更してください。
@@ -119,3 +119,9 @@ CI・自動テスト・エミュレータでのインストール／接続を検
 受け入れ項目は [ALPHA-SCOPE.md](ALPHA-SCOPE.md)、実施済み検証は [VALIDATION.md](VALIDATION.md)、追跡先は [Android実機Issue](https://github.com/lingmulongtai/Okuyuki-android/issues/3)・[Quest実機Issue](https://github.com/lingmulongtai/Okuyuki-quest/issues/3)です。
 
 メーカーの設定手順は2026-10-12に公式資料を確認しました。
+
+## 次回以降の更新
+
+起動時に更新を確認し、APKのハッシュ、パッケージ名、署名とバージョンを検証して取得します。画面の「インストール」を選び、初回はこのアプリからのインストールを許可して戻り、もう一度「インストール」を選びます。設定から手動確認もできます。通信エラー時は再試行します。QuestではOSのインストール画面が開くか実機未検証のため、開けない場合は上記のPCからの `adb install -r` を使用してください。alpha.9以前からは初回のみこのページの手動手順が必要です。
+
+alpha.12以降は、GitHub APIの利用上限に達した場合、公開リリース情報とチェックサムを使って再確認します。APKの署名検証は引き続き必要です。alpha.10・alpha.11で更新エラーが続く場合は、この版を一度手動で上書きしてください。

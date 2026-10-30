@@ -1,0 +1,15 @@
+<resources>
+    <string name="update_title">アプリの更新</string>
+    <string name="update_description">起動時に更新を確認します。</string>
+    <string name="update_check">更新を確認</string>
+    <string name="update_checking">更新を確認中…</string>
+    <string name="update_downloading">更新をダウンロード・検証中…</string>
+    <string name="update_ready">更新をインストールできます。</string>
+    <string name="update_current">最新版です。</string>
+    <string name="update_error">更新を取得できませんでした。通信を確認して再試行してください。</string>
+    <string name="update_install_error">インストーラーを開けませんでした。端末のインストール設定を確認してください。</string>
+    <string name="update_available">更新を利用できます</string>
+    <string name="update_prompt">バージョン %1$s を検証しました。インストールしますか？ 初回はこのアプリからのインストールを許可し、戻ってもう一度押してください。</string>
+    <string name="update_install">インストール</string>
+    <string name="update_later">あとで</string>
+</resources>

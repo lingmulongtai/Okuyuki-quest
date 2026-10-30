@@ -16,3 +16,7 @@ Android's MediaMetadataRetriever cannot expose HEIF ster item IDs. It is not use
 The decoder reads the standard ster group, decodes its explicit left/right handles sequentially and
 limits each displayed eye to a 2048-pixel long edge to bound bitmap memory. Actual decoding/eye acceptance
 requires a Samsung stereo HEIC on Quest hardware.
+
+## Meta Spatial SDK
+
+Quest immersive video uses Meta Spatial SDK 0.14.0 (base, toolkit and VR). The SDK is licensed under the [Meta Platform Technologies SDK License Agreement](https://developers.meta.com/vr/licenses/oculussdk/); see [Meta Spatial SDK packages](https://developers.meta.com/vr/documentation/spatial-sdk/spatial-sdk-packages/).
