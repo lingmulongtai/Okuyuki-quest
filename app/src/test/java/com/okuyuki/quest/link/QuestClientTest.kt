@@ -17,6 +17,24 @@ import org.junit.rules.TemporaryFolder
 
 class QuestClientTest {
     @get:Rule val folder = TemporaryFolder()
+    @Test fun `server websocket close promptly ends the session exactly once`() = runBlocking {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().withWebSocketUpgrade(object : okhttp3.WebSocketListener() {
+                override fun onOpen(webSocket: okhttp3.WebSocket, response: okhttp3.Response) {
+                    webSocket.close(1000, "session ended")
+                }
+            }))
+            server.start()
+            val ended = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val calls = java.util.concurrent.atomic.AtomicInteger()
+            QuestClient(Endpoint(server.hostName, server.port), TemporaryPhotoCache(folder.newFolder())).use { client ->
+                client.events(this, {}, { calls.incrementAndGet(); ended.complete(Unit) })
+                withTimeout(2000) { ended.await() }
+                delay(200)
+                assertEquals(1, calls.get())
+            }
+        }
+    }
     @Test fun `cancel a panorama metadata request while the body is stalled`() = runBlocking {
         MockWebServer().use { server ->
             server.start()

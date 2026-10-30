@@ -137,12 +137,18 @@ class QuestClient(val endpoint: Endpoint, private val cache: TemporaryPhotoCache
     fun events(scope: CoroutineScope, changed: () -> Unit, failed: () -> Unit) {
         socket?.cancel(); heartbeat?.cancel()
         socket = http.newWebSocket(request("/v1/events").build(), object : WebSocketListener() {
+            private val ended = java.util.concurrent.atomic.AtomicBoolean(false)
+            private fun notifyEnded() { if (ended.compareAndSet(false, true)) failed() }
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                notifyEnded()
+                webSocket.close(1000, null)
+            }
             override fun onMessage(webSocket: WebSocket, text: String) {
                 val event = runCatching { Protocol.json.decodeFromString<Event>(text) }.getOrNull()
                 if (event?.type == "library_changed" || event?.type == "panorama_changed") changed()
             }
-            override fun onFailure(webSocket: WebSocket, error: Throwable, response: Response?) { failed() }
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { failed() }
+            override fun onFailure(webSocket: WebSocket, error: Throwable, response: Response?) { notifyEnded() }
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { notifyEnded() }
         })
         heartbeat = scope.launch { while (isActive) { delay(15_000); socket?.send(Protocol.json.encodeToString(Event("heartbeat"))) } }
     }
