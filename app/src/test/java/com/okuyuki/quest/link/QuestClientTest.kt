@@ -2,6 +2,7 @@ package com.okuyuki.quest.link
 
 import com.okuyuki.protocol.Photo
 import com.okuyuki.protocol.PanoramaPhotoShare
+import com.okuyuki.protocol.PanoramaVideoShare
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancelAndJoin
@@ -64,6 +65,21 @@ class QuestClientTest {
                 repeat(4) { assertEquals("Bearer paired-token", server.takeRequest().getHeader("Authorization")) }
                 assertTrue(runCatching { client.panoramaPhotoBytes(share.copy(id = "../1")) }.isFailure)
                 assertEquals(4, server.requestCount)
+            }
+        }
+    }
+    @Test fun `video metadata uses bearer authentication and validates shares`() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(MockResponse().setResponseCode(404))
+            server.enqueue(MockResponse().setBody("""{"id":"0123456789abcdef0123456789abcdef","sizeBytes":5368709120}"""))
+            server.enqueue(MockResponse().setBody("""{"id":"../video","sizeBytes":10}"""))
+            QuestClient(Endpoint(server.hostName, server.port), TemporaryPhotoCache(folder.newFolder())).use { client ->
+                client.token = "paired-token"
+                assertNull(client.panoramaVideo())
+                assertEquals(PanoramaVideoShare("0123456789abcdef0123456789abcdef", 5368709120), client.panoramaVideo())
+                assertTrue(runCatching { client.panoramaVideo() }.isFailure)
+                repeat(3) { assertEquals("Bearer paired-token", server.takeRequest().getHeader("Authorization")) }
             }
         }
     }

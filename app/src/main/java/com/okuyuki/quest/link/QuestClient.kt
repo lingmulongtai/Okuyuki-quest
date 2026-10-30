@@ -78,6 +78,25 @@ class QuestClient(val endpoint: Endpoint, private val cache: TemporaryPhotoCache
         require(share.isValid()) { "360°写真の情報が正しくありません" }
         share
     }
+    /** An older phone may not yet offer video sharing. */
+    suspend fun panoramaVideo(): PanoramaVideoShare? = readResponse(request("/v2/panorama/video").build()) { response ->
+        if (response.code == 204 || response.code == 404) return@readResponse null
+        check(response.isSuccessful) { "360°動画の情報を取得できませんでした (${response.code})" }
+        val body = response.body ?: error("応答が空です")
+        require(body.contentLength() in -1..4096)
+        val share = Protocol.json.decodeFromString<PanoramaVideoShare>(readBounded(body.byteStream(), 4096).toString(Charsets.UTF_8))
+        require(share.isValid()) { "360°動画の情報が正しくありません" }
+        share
+    }
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    fun panoramaVideoSource(share: PanoramaVideoShare): androidx.media3.exoplayer.source.MediaSource {
+        require(share.isValid())
+        val authorization = "Bearer ${requireNotNull(token)}"
+        val data = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(http)
+            .setDefaultRequestProperties(mapOf("Authorization" to authorization))
+        val media = androidx.media3.common.MediaItem.fromUri(endpoint.url + "/v2/panorama/video/${share.id}")
+        return androidx.media3.exoplayer.source.ProgressiveMediaSource.Factory(data).createMediaSource(media)
+    }
     suspend fun panoramaPhotoBytes(share: PanoramaPhotoShare): ByteArray = panoramaDownloads.withLock {
         require(share.isValid())
         readResponse(request("/v2/panorama/photo/${share.id}").build()) { response ->
@@ -145,7 +164,7 @@ class QuestClient(val endpoint: Endpoint, private val cache: TemporaryPhotoCache
             }
             override fun onMessage(webSocket: WebSocket, text: String) {
                 val event = runCatching { Protocol.json.decodeFromString<Event>(text) }.getOrNull()
-                if (event?.type == "library_changed" || event?.type == "panorama_changed") changed()
+                if (event?.type == "library_changed" || event?.type == "panorama_changed" || event?.type == "panorama_video_changed") changed()
             }
             override fun onFailure(webSocket: WebSocket, error: Throwable, response: Response?) { notifyEnded() }
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { notifyEnded() }
