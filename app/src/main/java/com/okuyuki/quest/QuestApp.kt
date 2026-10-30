@@ -33,8 +33,8 @@ fun QuestApp(model: QuestViewModel) {
     var addressError by remember { mutableStateOf(false) }
     var settings by rememberSaveable { mutableStateOf(false) }
     val theme = darkColorScheme(primary = Color.White, onPrimary = Color(0xFF10131C), background = Color(0xFF090A0F), surface = Color(0xFF232630), onSurface = Color.White, onSurfaceVariant = Color(0xFFB5B6BD))
-    BackHandler(state.current != null || state.viewingPanorama) {
-        if (state.viewingPanorama) model.closePanorama() else model.backToLibrary()
+    BackHandler(state.current != null || state.viewingPanorama || state.viewingVideo) {
+        if (state.viewingVideo) model.closeVideo() else if (state.viewingPanorama) model.closePanorama() else model.backToLibrary()
     }
     MaterialTheme(colorScheme = theme) {
         Surface(Modifier.fillMaxSize(), color = theme.background) {

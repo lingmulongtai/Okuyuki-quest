@@ -39,6 +39,7 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
     private var panoramaRefresh: Job? = null
     private var panoramaPoll: Job? = null
     private var videoRefresh: Job? = null
+    private var videoRefreshRequested = false
     private var panoramaRefreshRequested = false
     private var lastEndpoint: Endpoint? = null
     private var cleanup: Job? = null
@@ -91,7 +92,7 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
             viewModelScope.launch {
                 if (client === connection) {
                     panoramaPoll?.cancel(); panoramaRefresh?.cancel(); panoramaOpening?.cancel(); videoRefresh?.cancel()
-                    panoramaRefreshRequested = false
+                    panoramaRefreshRequested = false; videoRefreshRequested = false
                     _state.update { it.copy(connected = false, sharedPanorama = null, viewingPanorama = false,
                         panoramaBytes = null, openingPanorama = false, sharedVideo = null, viewingVideo = false, error = "スマホとの接続が切れました。再接続してください") }
                 }
@@ -132,17 +133,23 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     private fun refreshVideo() {
-        if (!_state.value.connected || videoRefresh?.isActive == true) return
+        if (!_state.value.connected) return
         val connection = client ?: return
+        if (videoRefresh?.isActive == true) { videoRefreshRequested = true; return }
         videoRefresh = session.launch {
-            try {
-                val item = connection.panoramaVideo()
-                if (client !== connection || !_state.value.connected) return@launch
-                _state.update { state -> if (state.sharedVideo == item) state else state.copy(sharedVideo = item, viewingVideo = false) }
-            } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) {
-                if (client === connection) _state.update { it.copy(sharedVideo = null, viewingVideo = false) }
-            }
+            do {
+                videoRefreshRequested = false
+                try {
+                    val item = connection.panoramaVideo()
+                    if (client !== connection || !_state.value.connected) return@launch
+                    if (!videoRefreshRequested) {
+                        _state.update { state -> if (state.sharedVideo == item) state else state.copy(sharedVideo = item, viewingVideo = false) }
+                    }
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) {
+                    if (client === connection) _state.update { it.copy(sharedVideo = null, viewingVideo = false) }
+                }
+            } while (videoRefreshRequested && isActive && client === connection && _state.value.connected)
         }
     }
     fun openVideo() {
@@ -227,7 +234,7 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
     fun disconnect() {
         val oldSession = session.coroutineContext[Job]
         val old = client; client = null
-        old?.close(); session.cancel(); panoramaRefreshRequested = false; discovery.close()
+        old?.close(); session.cancel(); panoramaRefreshRequested = false; videoRefreshRequested = false; discovery.close()
         cleanup = drain.after(oldSession)
         _state.value = QuestState(message = "スマホで「Questとつなぐ」をオンにしてください")
     }
