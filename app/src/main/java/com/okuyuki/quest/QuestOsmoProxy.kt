@@ -19,6 +19,7 @@ import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.delay
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun QuestOsmoProxy(source: MediaSource, modifier: Modifier = Modifier) {
     val context = LocalContext.current

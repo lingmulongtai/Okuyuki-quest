@@ -20,6 +20,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun QuestOsmoVideo(sources: List<MediaSource>, modifier: Modifier = Modifier) {
     val context = LocalContext.current
