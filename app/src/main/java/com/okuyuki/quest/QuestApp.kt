@@ -82,51 +82,54 @@ fun QuestApp(model: QuestViewModel) {
                         Text(state.message)
                         OutlinedButton(onClick = { model.disconnect(); model.start() }) { Text("キャンセル") }
                     }
-                    state.viewingVideo -> {
-                        TextButton(onClick = model::closeVideo) { Text("一覧に戻る") }
-                        Text("360°動画 · ウィンドウ内プレビュー")
-                        val share = state.sharedVideo
-                        val videoGeneration = state.videoGeneration
-                        if (state.videoMotionLoading) {
-                            LinearProgressIndicator(Modifier.fillMaxWidth())
-                            Text("スマホから姿勢情報を確認しています…")
-                        }
-                        if (share != null && share.format in listOf(PanoramaVideoFormat.OSMO_LRF, PanoramaVideoFormat.OSMO_OSV) && !state.videoMotionLoading && state.videoMotion != null) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = state.videoStabilizationEnabled, onCheckedChange = { model.setVideoStabilization(it, share.id, videoGeneration) })
-                                Text("手ぶれ補正（実験的）")
+                    state.viewingVideo -> BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                        val previewHeight = (maxHeight * .55f).coerceAtLeast(180.dp)
+                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = model::closeVideo) { Text("一覧に戻る") }
+                            Text("360°動画 · ウィンドウ内プレビュー")
+                            val share = state.sharedVideo
+                            val videoGeneration = state.videoGeneration
+                            if (state.videoMotionLoading) {
+                                LinearProgressIndicator(Modifier.fillMaxWidth())
+                                Text("スマホから姿勢情報を確認しています…")
                             }
-                            if (state.videoStabilizationUnavailable) Text("映像フレームと姿勢を照合できないため、補正をオフにしました。")
-                        }
-                        if (share?.format == PanoramaVideoFormat.OSMO_OSV) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = highResolution, onCheckedChange = { highResolution = it })
-                                Text("没入表示を高画質にする（実験的・動作が重くなる場合があります）")
-                            }
-                        }
-                        if (share != null && !state.videoMotionLoading) {
-                            OutlinedButton(onClick = {
-                                if (model.prepareImmersiveVideo(highResolution)) {
-                                    try {
-                                        context.startActivity(Intent(context, ImmersiveActivity::class.java).apply {
-                                            action = Intent.ACTION_MAIN
-                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        })
-                                        (context as? Activity)?.finishAndRemoveTask()
-                                    } catch (_: Exception) {
-                                        ImmersivePlayback.cancel()
-                                        Toast.makeText(context, "没入画面を開けませんでした", Toast.LENGTH_LONG).show()
-                                    }
+                            if (share != null && share.format in listOf(PanoramaVideoFormat.OSMO_LRF, PanoramaVideoFormat.OSMO_OSV) && !state.videoMotionLoading && state.videoMotion != null) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Checkbox(checked = state.videoStabilizationEnabled, onCheckedChange = { model.setVideoStabilization(it, share.id, videoGeneration) })
+                                    Text("手ぶれ補正（実験的）")
                                 }
-                            }) { Text("没入表示を試す（実験的）") }
-                        }
-                        val sources = remember(share) { listOfNotNull(model.videoSource(), model.videoSource()) }
-                        if (!state.videoMotionLoading && sources.size == 2) when (share?.format) {
-                            PanoramaVideoFormat.OSMO_LRF -> QuestOsmoProxy(sources[0], share.calibration, state.videoMotion, state.videoStabilizationEnabled,
-                                { model.videoStabilizationUnavailable(share.id, videoGeneration) }, Modifier.weight(1f).fillMaxWidth())
-                            PanoramaVideoFormat.OSMO_OSV -> QuestOsmoVideo(sources, share.calibration, state.videoMotion, state.videoStabilizationEnabled,
-                                { model.videoStabilizationUnavailable(share.id, videoGeneration) }, Modifier.weight(1f).fillMaxWidth())
-                            else -> QuestPanoramaVideo(sources[0], Modifier.weight(1f).fillMaxWidth())
+                                if (state.videoStabilizationUnavailable) Text("映像フレームと姿勢を照合できないため、補正をオフにしました。")
+                            }
+                            if (share?.format == PanoramaVideoFormat.OSMO_OSV) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Checkbox(checked = highResolution, onCheckedChange = { highResolution = it })
+                                    Text("没入表示を高画質にする（実験的・動作が重くなる場合があります）")
+                                }
+                            }
+                            if (share != null && !state.videoMotionLoading) {
+                                OutlinedButton(onClick = {
+                                    if (model.prepareImmersiveVideo(highResolution)) {
+                                        try {
+                                            context.startActivity(Intent(context, ImmersiveActivity::class.java).apply {
+                                                action = Intent.ACTION_MAIN
+                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            })
+                                            (context as? Activity)?.finishAndRemoveTask()
+                                        } catch (_: Exception) {
+                                            ImmersivePlayback.cancel()
+                                            Toast.makeText(context, "没入画面を開けませんでした", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                }) { Text("没入表示を試す（実験的）") }
+                            }
+                            val sources = remember(share) { listOfNotNull(model.videoSource(), model.videoSource()) }
+                            if (!state.videoMotionLoading && sources.size == 2) when (share?.format) {
+                                PanoramaVideoFormat.OSMO_LRF -> QuestOsmoProxy(sources[0], share.calibration, state.videoMotion, state.videoStabilizationEnabled,
+                                    { model.videoStabilizationUnavailable(share.id, videoGeneration) }, Modifier.height(previewHeight).fillMaxWidth())
+                                PanoramaVideoFormat.OSMO_OSV -> QuestOsmoVideo(sources, share.calibration, state.videoMotion, state.videoStabilizationEnabled,
+                                    { model.videoStabilizationUnavailable(share.id, videoGeneration) }, Modifier.height(previewHeight).fillMaxWidth())
+                                else -> QuestPanoramaVideo(sources[0], Modifier.height(previewHeight).fillMaxWidth())
+                            }
                         }
                     }
                     state.viewingPanorama -> {
