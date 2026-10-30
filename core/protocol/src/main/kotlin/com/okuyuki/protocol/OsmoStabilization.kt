@@ -71,6 +71,8 @@ class FrameCorrectionMatcher(private val timestamps: FrameTimestampMap, private 
 /** Causal rotational smoothing in the Osmo body frame; corrections are w,x,y,z. */
 class OsmoStabilization(track: OsmoMotionTrack) {
     private val frames = track.frames
+    private val packedFrames = frames as? PackedMotionFrames
+    private fun timeAt(index: Int): Long = packedFrames?.timeAt(index) ?: frames[index].presentationTimeUs
     private val tolerance = track.frameIntervalUs / 2
     private val corrections: FloatArray
     init {
@@ -88,14 +90,14 @@ class OsmoStabilization(track: OsmoMotionTrack) {
         }
     }
     fun correctionAt(presentationUs: Long): FloatArray? {
-        if (presentationUs < 0 || presentationUs > frames.last().presentationTimeUs + tolerance) return null
+        if (presentationUs < 0 || presentationUs > timeAt(frames.lastIndex) + tolerance) return null
         var low = 0; var high = frames.lastIndex
         while (low < high) {
             val mid = (low + high) ushr 1
-            if (frames[mid].presentationTimeUs < presentationUs) low = mid + 1 else high = mid
+            if (timeAt(mid) < presentationUs) low = mid + 1 else high = mid
         }
-        val index = if (low > 0 && presentationUs - frames[low - 1].presentationTimeUs < frames[low].presentationTimeUs - presentationUs) low - 1 else low
-        if (kotlin.math.abs(frames[index].presentationTimeUs - presentationUs) > tolerance) return null
+        val index = if (low > 0 && presentationUs - timeAt(low - 1) < timeAt(low) - presentationUs) low - 1 else low
+        if (kotlin.math.abs(timeAt(index) - presentationUs) > tolerance) return null
         return corrections.copyOfRange(index * 4, index * 4 + 4)
     }
     companion object {

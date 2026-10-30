@@ -19,11 +19,18 @@ object OsmoMotionCodec {
     fun isValid(track: OsmoMotionTrack): Boolean {
         if (track.frames.size !in 1..MAX_FRAMES || track.frameIntervalUs !in 1L..1_000_000L) return false
         var previous = -1L
-        for ((index, frame) in track.frames.withIndex()) {
-            if (frame.storedAttitude.size != 4 || frame.storedAttitude.any { !it.isFinite() }) return false
-            val norm = frame.storedAttitude.sumOf { (it * it).toDouble() }
+        val packed = track.frames as? PackedMotionFrames
+        for (index in track.frames.indices) {
+            val frame = if (packed == null) track.frames[index] else null
+            if (frame != null && frame.storedAttitude.size != 4) return false
+            var norm = 0.0
+            for (component in 0..3) {
+                val value = packed?.componentAt(index, component) ?: frame!!.storedAttitude[component]
+                if (!value.isFinite()) return false
+                norm += (value * value).toDouble()
+            }
             if (norm !in 0.99..1.01) return false
-            val time = frame.presentationTimeUs
+            val time = packed?.timeAt(index) ?: frame!!.presentationTimeUs
             if (index == 0) { if (time != 0L) return false }
             else {
                 if (time <= previous || time > MAX_FRAMES.toLong() * 1_000_001L) return false
@@ -38,9 +45,16 @@ object OsmoMotionCodec {
         require(isValid(track)) { "Invalid camera motion track" }
         val buffer = ByteBuffer.allocate(HEADER_BYTES + track.frames.size * FRAME_BYTES).order(ByteOrder.BIG_ENDIAN)
         buffer.putInt(MAGIC).putInt(track.frames.size).putLong(track.frameIntervalUs)
-        for (frame in track.frames) {
-            buffer.putLong(frame.presentationTimeUs)
-            frame.storedAttitude.forEach(buffer::putFloat)
+        val packed = track.frames as? PackedMotionFrames
+        for (index in track.frames.indices) {
+            if (packed != null) {
+                buffer.putLong(packed.timeAt(index))
+                for (component in 0..3) buffer.putFloat(packed.componentAt(index, component))
+            } else {
+                val frame = track.frames[index]
+                buffer.putLong(frame.presentationTimeUs)
+                frame.storedAttitude.forEach(buffer::putFloat)
+            }
         }
         return buffer.array()
     }
@@ -52,12 +66,11 @@ object OsmoMotionCodec {
         val count = buffer.int
         val interval = buffer.long
         require(count in 1..MAX_FRAMES && bytes.size == HEADER_BYTES + count * FRAME_BYTES)
-        val frames = ArrayList<OsmoMotionFrame>(count)
+        val frames = PackedMotionFrames.Builder(count)
         repeat(count) {
             val time = buffer.long
-            val attitude = List(4) { buffer.float }
-            frames += OsmoMotionFrame(time, attitude)
+            frames.add(time, buffer.float, buffer.float, buffer.float, buffer.float)
         }
-        return OsmoMotionTrack(frames, interval).also { require(isValid(it)) { "Invalid camera motion track" } }
+        return OsmoMotionTrack(frames.build(), interval).also { require(isValid(it)) { "Invalid camera motion track" } }
     }
 }

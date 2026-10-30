@@ -16,6 +16,16 @@ class OsmoMotionCodecTest {
         assertEquals(OsmoMotionCodec.HEADER_BYTES + 2 * OsmoMotionCodec.FRAME_BYTES, bytes.size)
         assertEquals(track(), OsmoMotionCodec.decode(bytes))
     }
+    @Test fun `decoded attitudes use immutable packed storage`() {
+        val decoded = OsmoMotionCodec.decode(OsmoMotionCodec.encode(track()))
+        assertTrue(decoded.frames is PackedMotionFrames)
+        assertEquals(track().frames, decoded.frames)
+        val builder = PackedMotionFrames.Builder(1)
+        builder.add(0, 0f, 0f, 0f, 1f)
+        val frames = builder.build()
+        assertThrows(IllegalStateException::class.java) { builder.add(1, 0f, 0f, 0f, 1f) }
+        assertEquals(OsmoMotionFrame(0, listOf(0f, 0f, 0f, 1f)), frames[0])
+    }
     @Test fun `rejects malformed or oversized motion payloads`() {
         val bytes = OsmoMotionCodec.encode(track())
         assertThrows(Exception::class.java) { OsmoMotionCodec.decode(bytes.copyOf(bytes.size - 1)) }
