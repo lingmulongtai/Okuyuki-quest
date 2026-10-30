@@ -182,7 +182,10 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 // OkHttp's read timeout bounds stalls; a progressing long transfer may need more than 12 seconds.
                 val track = connection.panoramaVideoMotion(share)
-                val correction = track?.let { withContext(Dispatchers.Default) { OsmoStabilization(it) } }
+                val correction = track?.let { withContext(Dispatchers.Default) {
+                    val workContext = coroutineContext
+                    OsmoStabilization(it) { workContext.ensureActive() }
+                } }
                 if (client !== connection) return@launch
                 _state.update { current ->
                     if (!current.connected || !current.viewingVideo || current.sharedVideo != share || current.videoGeneration != generation) current
