@@ -34,6 +34,19 @@ class ProtocolTest {
             Protocol.json.decodeFromString<PanoramaVideoShare>("""{"id":"0123456789abcdef0123456789abcdef","sizeBytes":10,"format":"UNRECOGNIZED"}""")
         }
     }
+    @Test fun `raw lens calibration round trips and rejects malformed values`() {
+        val lens = PanoramaLensCalibration(listOf(1200f, 1200f, 1920f, 1920f), List(5) { 0f }, listOf(1f, 0f, 0f, 0f))
+        val calibration = PanoramaStereoCalibration(lens, lens)
+        val share = PanoramaVideoShare("0123456789abcdef0123456789abcdef", 10, PanoramaVideoFormat.OSMO_LRF, calibration)
+        assertTrue(share.isValid())
+        assertEquals(share, Protocol.json.decodeFromString<PanoramaVideoShare>(Protocol.json.encodeToString(share)))
+        assertFalse(share.copy(format = PanoramaVideoFormat.EQUIRECTANGULAR_MP4).isValid())
+        assertFalse(lens.copy(intrinsics = emptyList()).isValid())
+        assertFalse(lens.copy(distortion = listOf(Float.NaN, 0f, 0f, 0f, 0f)).isValid())
+        assertFalse(lens.copy(distortion = listOf(11f, 0f, 0f, 0f, 0f)).isValid())
+        assertFalse(lens.copy(quaternion = listOf(0f, 0f, 0f, 0f)).isValid())
+        assertFalse(share.copy(calibration = calibration.copy(right = lens.copy(intrinsics = listOf(0f, 1f, 1f, 1f)))).isValid())
+    }
     @Test fun `resume and suffix ranges are bounded to the source`() {
         assertEquals(ByteRange(4, 9), ByteRange.parse("bytes=4-", 10))
         assertEquals(ByteRange(8, 9), ByteRange.parse("bytes=-2", 10))

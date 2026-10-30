@@ -45,10 +45,35 @@ data class PanoramaPhotoShare(val id: String, val sizeBytes: Long) {
 @Serializable
 enum class PanoramaVideoFormat { EQUIRECTANGULAR_MP4, OSMO_LRF, OSMO_OSV }
 
+/** Source-sensor calibration; quaternion order is w, x, y, z. */
+@Serializable
+data class PanoramaLensCalibration(val intrinsics: List<Float>, val distortion: List<Float>, val quaternion: List<Float>) {
+    fun isValid(): Boolean {
+        if (intrinsics.size != 4 || distortion.size != 5 || quaternion.size != 4) return false
+        if (!(intrinsics + distortion + quaternion).all { it.isFinite() }) return false
+        if (intrinsics[0] !in 1f..3840f || intrinsics[1] !in 1f..3840f ||
+            intrinsics[2] !in 0f..3840f || intrinsics[3] !in 0f..3840f) return false
+        if (distortion.any { kotlin.math.abs(it) > 10f }) return false
+        return quaternion.sumOf { (it * it).toDouble() } in 0.99..1.01
+    }
+}
+
+@Serializable
+data class PanoramaStereoCalibration(val left: PanoramaLensCalibration, val right: PanoramaLensCalibration) {
+    fun isValid(): Boolean = left.isValid() && right.isValid()
+}
+
 /** A single explicitly shared panoramic video. */
 @Serializable
-data class PanoramaVideoShare(val id: String, val sizeBytes: Long, val format: PanoramaVideoFormat = PanoramaVideoFormat.EQUIRECTANGULAR_MP4) {
-    fun isValid(): Boolean = id.matches(Regex("[0-9a-f]{32}")) && sizeBytes in 1..Protocol.MAX_PANORAMA_VIDEO_BYTES
+data class PanoramaVideoShare(
+    val id: String,
+    val sizeBytes: Long,
+    val format: PanoramaVideoFormat = PanoramaVideoFormat.EQUIRECTANGULAR_MP4,
+    val calibration: PanoramaStereoCalibration? = null,
+) {
+    fun isValid(): Boolean = id.matches(Regex("[0-9a-f]{32}")) &&
+        sizeBytes in 1..Protocol.MAX_PANORAMA_VIDEO_BYTES &&
+        (calibration == null || (format != PanoramaVideoFormat.EQUIRECTANGULAR_MP4 && calibration.isValid()))
 }
 
 @Serializable
