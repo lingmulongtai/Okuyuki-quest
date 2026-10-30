@@ -63,6 +63,13 @@ class OsmoFramePairerTest {
         pairer.drainComplete(1, gen)
         assertEquals(OsmoPairAction.Ended, pairer.next())
     }
+    @Test fun `discarding an unknown timestamp permits a later verified pair`() {
+        val pairer = OsmoFramePairer(); val gen = pairer.reset()
+        pairer.frameAvailable(0, gen); assertEquals(OsmoPairAction.Latch(0, gen), pairer.next())
+        pairer.discarded(0, gen); assertEquals(OsmoPairAction.Wait, pairer.next())
+        latch(pairer, 0, 20); latch(pairer, 1, 20)
+        assertEquals(OsmoPairAction.Present(20, gen), pairer.next())
+    }
     @Test fun `reordered frames are rejected but duplicate notifications are harmless`() {
         val pairer = OsmoFramePairer(); pairer.reset()
         latch(pairer, 0, 20, 100); latch(pairer, 1, 20, 200)

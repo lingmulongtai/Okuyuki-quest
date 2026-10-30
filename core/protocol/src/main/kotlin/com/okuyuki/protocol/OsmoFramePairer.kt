@@ -88,6 +88,13 @@ class OsmoFramePairer {
         if (frame.presentationTimeUs < minimumPresentationUs) return
         frames[side] = frame; presented = false
     }
+    /** Discard an unmatchable latched texture; callers must bound repeated misses. */
+    @Synchronized fun discarded(side: Int, callbackGeneration: Long) {
+        require(side in 0..1)
+        if (callbackGeneration != generation) return
+        if (requested != side) { invalid = true; return }
+        requested = null
+    }
     @Synchronized fun presented(presentationTimeUs: Long, callbackGeneration: Long) {
         if (callbackGeneration != generation) return
         val left = frames[0]; val right = frames[1]
