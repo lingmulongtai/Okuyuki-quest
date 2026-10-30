@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -147,11 +148,11 @@ fun QuestApp(model: QuestViewModel) {
                             TextButton(onClick = model::refresh) { Text("更新") }
                         }
                         if (state.photos.isEmpty()) Text("3D写真が見つかりません。スマホ側で写真のアクセス許可とギャラリーを確認してください。")
-                        LazyVerticalGrid(columns = GridCells.Adaptive(180.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        LazyVerticalGrid(columns = GridCells.Adaptive(180.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             state.photos.groupBy { date(it.takenAt) }.forEach { (day, photos) ->
                                 item(span = { GridItemSpan(maxLineSpan) }) { Text(day, Modifier.padding(vertical = 12.dp), style = MaterialTheme.typography.titleMedium) }
                                 items(photos, key = { it.id }) { photo ->
-                                    Box(Modifier.aspectRatio(1f).clickable { model.open(photo) }) { QuestThumbnail(model, photo, Modifier.fillMaxSize()) }
+                                    Box(Modifier.aspectRatio(1f).clip(RoundedCornerShape(18.dp)).clickable { model.open(photo) }) { QuestThumbnail(model, photo, Modifier.fillMaxSize()) }
                                 }
                             }
                             if (state.next != null) item(span = { GridItemSpan(maxLineSpan) }) {
@@ -159,24 +160,27 @@ fun QuestApp(model: QuestViewModel) {
                             }
                         }
                     }
-                    else -> Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                        Text(state.message, style = MaterialTheme.typography.titleLarge)
-                        Text("同じWi-Fiまたはスマホのテザリングに接続してください。")
-                        nearby.forEach { phone ->
-                            OutlinedCard(onClick = { model.connect(phone.endpoint) }, modifier = Modifier.fillMaxWidth()) {
-                                Row(Modifier.padding(24.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text(phone.name, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge); Text("つなぐ")
+                    else -> Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        GlassPanel(Modifier.fillMaxWidth()) {
+                            Text(state.message, style = MaterialTheme.typography.titleLarge)
+                            Text("同じWi-Fiまたはスマホのテザリングに接続してください。", color = theme.onSurfaceVariant)
+                            nearby.forEach { phone ->
+                                OutlinedCard(onClick = { model.connect(phone.endpoint) }, modifier = Modifier.fillMaxWidth()) {
+                                    Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Text(phone.name, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge); Text("つなぐ")
+                                    }
                                 }
                             }
+                            if (nearby.isEmpty()) Text("近くのスマホを探しています…", color = theme.onSurfaceVariant)
+                            discoveryError?.let { Text(it) }
                         }
-                        if (nearby.isEmpty()) Text("近くのスマホを探しています…", color = theme.onSurfaceVariant)
-                        discoveryError?.let { Text(it) }
-                        HorizontalDivider()
-                        Text("アドレスを入力してつなぐ", style = MaterialTheme.typography.titleMedium)
-                        OutlinedTextField(value = address, onValueChange = { address = it; addressError = false }, singleLine = true,
-                            label = { Text("スマホに表示されたアドレス") }, placeholder = { Text("192.168.1.2:12345") }, isError = addressError,
-                            supportingText = { if (addressError) Text("スマホに表示されたIPアドレスとポートを入力してください") }, modifier = Modifier.fillMaxWidth())
-                        Button(onClick = { val endpoint = Endpoint.parse(address); if (endpoint == null) addressError = true else model.connect(endpoint) }) { Text("つなぐ") }
+                        GlassPanel(Modifier.fillMaxWidth()) {
+                            Text("アドレスを入力してつなぐ", style = MaterialTheme.typography.titleMedium)
+                            OutlinedTextField(value = address, onValueChange = { address = it; addressError = false }, singleLine = true,
+                                label = { Text("スマホに表示されたアドレス") }, placeholder = { Text("192.168.1.2:12345") }, isError = addressError,
+                                supportingText = { if (addressError) Text("スマホに表示されたIPアドレスとポートを入力してください") }, modifier = Modifier.fillMaxWidth())
+                            Button(onClick = { val endpoint = Endpoint.parse(address); if (endpoint == null) addressError = true else model.connect(endpoint) }) { Text("つなぐ") }
+                        }
                     }
                 }
             }
