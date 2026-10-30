@@ -8,6 +8,7 @@ class PackedMotionFrames private constructor(
     override val size: Int get() = times.size
     fun timeAt(index: Int): Long = times[index]
     fun componentAt(index: Int, component: Int): Float {
+        if (index !in indices) throw IndexOutOfBoundsException("Motion frame index: $index")
         require(component in 0..3)
         return attitudes[index * 4 + component]
     }

@@ -4,6 +4,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.io.ByteArrayInputStream
 
 class OsmoMotionCodecTest {
     private fun track() = OsmoMotionTrack(listOf(
@@ -25,6 +26,23 @@ class OsmoMotionCodecTest {
         val frames = builder.build()
         assertThrows(IllegalStateException::class.java) { builder.add(1, 0f, 0f, 0f, 1f) }
         assertEquals(OsmoMotionFrame(0, listOf(0f, 0f, 0f, 1f)), frames[0])
+        assertThrows(IndexOutOfBoundsException::class.java) { frames.componentAt(1 shl 30, 0) }
+    }
+    @Test fun `streaming decode supports unknown length and rejects trailing bytes`() {
+        val bytes = OsmoMotionCodec.encode(track())
+        assertEquals(track(), OsmoMotionCodec.decode(ByteArrayInputStream(bytes), -1))
+        val fragmented = object : ByteArrayInputStream(bytes) {
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int = super.read(buffer, offset, minOf(length, 3))
+        }
+        assertEquals(track(), OsmoMotionCodec.decode(fragmented, bytes.size.toLong()))
+        assertThrows(Exception::class.java) { OsmoMotionCodec.decode(ByteArrayInputStream(bytes + 0), -1) }
+        assertThrows(Exception::class.java) { OsmoMotionCodec.decode(ByteArrayInputStream(bytes.copyOf(bytes.size - 1)), -1) }
+        assertThrows(Exception::class.java) { OsmoMotionCodec.decode(ByteArrayInputStream(bytes), bytes.size.toLong() + 1) }
+        val invalidInterval = bytes.clone().also { ByteBuffer.wrap(it).order(ByteOrder.BIG_ENDIAN).putLong(8, 0) }
+        assertThrows(Exception::class.java) { OsmoMotionCodec.decode(invalidInterval) }
+        assertThrows(java.util.concurrent.CancellationException::class.java) {
+            OsmoMotionCodec.decode(ByteArrayInputStream(bytes), bytes.size.toLong()) { throw java.util.concurrent.CancellationException() }
+        }
     }
     @Test fun `long tracks round trip beyond the previous frame limit`() {
         val count = 180_001

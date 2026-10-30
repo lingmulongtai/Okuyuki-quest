@@ -2,6 +2,10 @@ package com.okuyuki.protocol
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.io.BufferedInputStream
+import java.io.ByteArrayInputStream
+import java.io.DataInputStream
+import java.io.InputStream
 import kotlin.math.abs
 
 /** A camera attitude in the four-component order stored in Osmo metadata. */
@@ -16,11 +20,14 @@ object OsmoMotionCodec {
     const val MAX_BYTES = HEADER_BYTES + MAX_FRAMES * FRAME_BYTES
     private const val MAGIC = 0x4f4b4d31 // OKM1
 
-    fun isValid(track: OsmoMotionTrack): Boolean {
+    fun isValid(track: OsmoMotionTrack): Boolean = isValid(track) { }
+
+    private fun isValid(track: OsmoMotionTrack, checkActive: () -> Unit): Boolean {
         if (track.frames.size !in 1..MAX_FRAMES || track.frameIntervalUs !in 1L..1_000_000L) return false
         var previous = -1L
         val packed = track.frames as? PackedMotionFrames
         for (index in track.frames.indices) {
+            if (index % 1024 == 0) checkActive()
             val frame = if (packed == null) track.frames[index] else null
             if (frame != null && frame.storedAttitude.size != 4) return false
             var norm = 0.0
@@ -59,18 +66,27 @@ object OsmoMotionCodec {
         return buffer.array()
     }
 
-    fun decode(bytes: ByteArray): OsmoMotionTrack {
-        require(bytes.size in (HEADER_BYTES + FRAME_BYTES)..MAX_BYTES)
-        val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN)
-        require(buffer.int == MAGIC) { "Unsupported camera motion format" }
-        val count = buffer.int
-        val interval = buffer.long
-        require(count in 1..MAX_FRAMES && bytes.size == HEADER_BYTES + count * FRAME_BYTES)
+    fun decode(bytes: ByteArray): OsmoMotionTrack = decode(ByteArrayInputStream(bytes), bytes.size.toLong())
+
+    /** Decode incrementally so a long network response does not need a second full-size buffer. */
+    fun decode(input: InputStream, length: Long, checkActive: () -> Unit = {}): OsmoMotionTrack {
+        require(length == -1L || length in (HEADER_BYTES + FRAME_BYTES).toLong()..MAX_BYTES.toLong())
+        val stream = DataInputStream(BufferedInputStream(input, 64 * 1024))
+        require(stream.readInt() == MAGIC) { "Unsupported camera motion format" }
+        val count = stream.readInt()
+        val interval = stream.readLong()
+        require(count in 1..MAX_FRAMES)
+        require(interval in 1L..1_000_000L)
+        val expectedLength = HEADER_BYTES.toLong() + count.toLong() * FRAME_BYTES
+        require(length == -1L || length == expectedLength)
         val frames = PackedMotionFrames.Builder(count)
-        repeat(count) {
-            val time = buffer.long
-            frames.add(time, buffer.float, buffer.float, buffer.float, buffer.float)
+        repeat(count) { index ->
+            if (index % 1024 == 0) checkActive()
+            val time = stream.readLong()
+            frames.add(time, stream.readFloat(), stream.readFloat(), stream.readFloat(), stream.readFloat())
         }
-        return OsmoMotionTrack(frames.build(), interval).also { require(isValid(it)) { "Invalid camera motion track" } }
+        checkActive()
+        require(stream.read() == -1) { "Unexpected trailing camera motion data" }
+        return OsmoMotionTrack(frames.build(), interval).also { require(isValid(it, checkActive)) { "Invalid camera motion track" } }
     }
 }
