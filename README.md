@@ -8,7 +8,7 @@ Project: https://github.com/users/lingmulongtai/projects/2
 
 ## GalaxyとQuest 3Sで試す
 
-**開発版で360°写真の共有を試す場合:** [Galaxy・Quest実機テスト用プレビュー](docs/DEVICE-PREVIEW.md)をご覧ください。
+**開発版で360°写真・動画の共有を試す場合:** [Galaxy・Quest実機テスト用プレビュー](docs/DEVICE-PREVIEW.md)をご覧ください。
 
 配布中のアルファは **v0.1.0-alpha.1** です。Galaxyは **Android 16** が必要です。
 
