@@ -46,7 +46,7 @@ internal class OsmoImmersivePlayback(
         timestamps[index].record(releaseNs, pts)
     } }
     private val renderer = OsmoSphericalRenderer(output, proxy, session.share.calibration,
-        if (proxy) session.stabilization else null, timestamps, ::prepare, ::fail, ::syncFailure, onStabilizationUnavailable)
+        session.stabilization, timestamps, ::prepare, ::fail, ::syncFailure, onStabilizationUnavailable)
 
     private fun prepare(surfaces: List<Surface>) {
         if (closed) return

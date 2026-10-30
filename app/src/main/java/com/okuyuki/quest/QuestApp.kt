@@ -77,10 +77,10 @@ fun QuestApp(model: QuestViewModel) {
                             LinearProgressIndicator(Modifier.fillMaxWidth())
                             Text("スマホから姿勢情報を確認しています…")
                         }
-                        if (share?.format == PanoramaVideoFormat.OSMO_LRF && !state.videoMotionLoading && state.videoMotion != null) {
+                        if (share != null && share.format in listOf(PanoramaVideoFormat.OSMO_LRF, PanoramaVideoFormat.OSMO_OSV) && !state.videoMotionLoading && state.videoMotion != null) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(checked = state.videoStabilizationEnabled, onCheckedChange = { model.setVideoStabilization(it, share.id, state.videoGeneration) })
-                                Text("手ぶれ補正（実験的）")
+                                Text(if (share.format == PanoramaVideoFormat.OSMO_OSV) "没入表示の手ぶれ補正（実験的）" else "手ぶれ補正（実験的）")
                             }
                             if (state.videoStabilizationUnavailable) Text("映像フレームと姿勢を照合できないため、補正をオフにしました。")
                         }

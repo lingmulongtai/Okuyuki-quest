@@ -182,7 +182,12 @@ internal class OsmoSphericalRenderer(
             val pendingPair = pendingPresentation
             if (pendingPair != null) {
                 if (!visible) return
-                drawFrame(null)
+                val correction = if (stabilizationEnabled) stabilization?.correctionAt(pendingPair.presentationTimeUs) else null
+                if (stabilizationEnabled && correction == null) {
+                    stabilizationEnabled = false
+                    main.post { if (!closed && !failed) onStabilizationUnavailable() }
+                }
+                drawFrame(correction)
                 coordinator.presented(pendingPair.presentationTimeUs, pendingPair.generation)
                 pendingPresentation = null
                 lastPresentedPts = pendingPair.presentationTimeUs
