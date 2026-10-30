@@ -28,6 +28,7 @@ android {
         isMinifyEnabled = false
         signingConfig = signingConfigs.findByName("release")
     } }
+    externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.22.1" } }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
