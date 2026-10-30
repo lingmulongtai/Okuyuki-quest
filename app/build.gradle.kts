@@ -11,8 +11,8 @@ android {
         applicationId = "com.okuyuki.quest"
         minSdk = 32
         targetSdk = 34
-        versionCode = 10
-        versionName = "0.1.0-alpha.11-preview"
+        versionCode = 11
+        versionName = "0.1.0-alpha.12-preview"
         ndk { abiFilters += "arm64-v8a" }
     }
     signingConfigs {
