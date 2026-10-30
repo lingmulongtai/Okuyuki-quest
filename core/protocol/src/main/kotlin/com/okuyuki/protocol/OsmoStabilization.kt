@@ -69,7 +69,8 @@ class FrameCorrectionMatcher(private val timestamps: FrameTimestampMap, private 
 }
 
 /** Causal rotational smoothing in the Osmo body frame; corrections are w,x,y,z. */
-class OsmoStabilization(track: OsmoMotionTrack) {
+class OsmoStabilization(track: OsmoMotionTrack, checkActive: () -> Unit) {
+    constructor(track: OsmoMotionTrack) : this(track, {})
     private val frames = track.frames
     private val packedFrames = frames as? PackedMotionFrames
     private fun timeAt(index: Int): Long = packedFrames?.timeAt(index) ?: frames[index].presentationTimeUs
@@ -84,6 +85,7 @@ class OsmoStabilization(track: OsmoMotionTrack) {
         var target = attitudeAt(0)
         corrections = FloatArray(frames.size * 4)
         for (index in frames.indices) {
+            if (index % 1024 == 0) checkActive()
             val current = attitudeAt(index)
             val time = timeAt(index)
             val dt = (time - previousTime).coerceAtLeast(0L).toDouble() / 1000000.0

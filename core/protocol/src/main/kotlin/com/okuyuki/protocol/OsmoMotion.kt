@@ -48,12 +48,15 @@ object OsmoMotionCodec {
         return true
     }
 
-    fun encode(track: OsmoMotionTrack): ByteArray {
-        require(isValid(track)) { "Invalid camera motion track" }
+    fun encode(track: OsmoMotionTrack): ByteArray = encode(track) { }
+
+    fun encode(track: OsmoMotionTrack, checkActive: () -> Unit): ByteArray {
+        require(isValid(track, checkActive)) { "Invalid camera motion track" }
         val buffer = ByteBuffer.allocate(HEADER_BYTES + track.frames.size * FRAME_BYTES).order(ByteOrder.BIG_ENDIAN)
         buffer.putInt(MAGIC).putInt(track.frames.size).putLong(track.frameIntervalUs)
         val packed = track.frames as? PackedMotionFrames
         for (index in track.frames.indices) {
+            if (index % 1024 == 0) checkActive()
             if (packed != null) {
                 buffer.putLong(packed.timeAt(index))
                 for (component in 0..3) buffer.putFloat(packed.componentAt(index, component))

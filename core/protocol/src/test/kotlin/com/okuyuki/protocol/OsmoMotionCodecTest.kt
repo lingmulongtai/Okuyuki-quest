@@ -56,6 +56,14 @@ class OsmoMotionCodecTest {
         assertArrayEquals(floatArrayOf(1f, 0f, 0f, 0f), smooth.correctionAt(50_000L * 20_000), 0.0001f)
         assertArrayEquals(floatArrayOf(1f, 0f, 0f, 0f), smooth.correctionAt((count - 1L) * 20_000), 0.0001f)
         assertNull(smooth.correctionAt(count * 20_000L + 10_001L))
+        var encodeChecks = 0
+        assertThrows(java.util.concurrent.CancellationException::class.java) {
+            OsmoMotionCodec.encode(original) { if (++encodeChecks == 3) throw java.util.concurrent.CancellationException() }
+        }
+        var smoothChecks = 0
+        assertThrows(java.util.concurrent.CancellationException::class.java) {
+            OsmoStabilization(decoded) { if (++smoothChecks == 3) throw java.util.concurrent.CancellationException() }
+        }
     }
     @Test fun `rejects malformed or oversized motion payloads`() {
         val bytes = OsmoMotionCodec.encode(track())
