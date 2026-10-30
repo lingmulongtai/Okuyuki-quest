@@ -3,6 +3,7 @@ package com.okuyuki.quest.link
 import com.okuyuki.protocol.Photo
 import com.okuyuki.protocol.PanoramaPhotoShare
 import com.okuyuki.protocol.PanoramaVideoShare
+import com.okuyuki.protocol.PanoramaVideoFormat
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancelAndJoin
@@ -72,6 +73,7 @@ class QuestClientTest {
         MockWebServer().use { server ->
             server.start()
             server.enqueue(MockResponse().setResponseCode(404))
+            server.enqueue(MockResponse().setResponseCode(404))
             server.enqueue(MockResponse().setBody("""{"id":"0123456789abcdef0123456789abcdef","sizeBytes":5368709120}"""))
             server.enqueue(MockResponse().setBody("""{"id":"../video","sizeBytes":10}"""))
             QuestClient(Endpoint(server.hostName, server.port), TemporaryPhotoCache(folder.newFolder())).use { client ->
@@ -79,7 +81,20 @@ class QuestClientTest {
                 assertNull(client.panoramaVideo())
                 assertEquals(PanoramaVideoShare("0123456789abcdef0123456789abcdef", 5368709120), client.panoramaVideo())
                 assertTrue(runCatching { client.panoramaVideo() }.isFailure)
-                repeat(3) { assertEquals("Bearer paired-token", server.takeRequest().getHeader("Authorization")) }
+                repeat(4) { assertEquals("Bearer paired-token", server.takeRequest().getHeader("Authorization")) }
+            }
+        }
+    }
+    @Test fun `raw video metadata is available without exposing it to legacy clients`() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(MockResponse().setBody("""{"id":"0123456789abcdef0123456789abcdef","sizeBytes":10,"format":"OSMO_OSV"}"""))
+            QuestClient(Endpoint(server.hostName, server.port), TemporaryPhotoCache(folder.newFolder())).use { client ->
+                client.token = "paired-token"
+                assertEquals(PanoramaVideoFormat.OSMO_OSV, client.panoramaVideo()!!.format)
+                val request = server.takeRequest()
+                assertEquals("/v3/panorama/video", request.path)
+                assertEquals("Bearer paired-token", request.getHeader("Authorization"))
             }
         }
     }

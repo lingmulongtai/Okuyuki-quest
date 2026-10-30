@@ -78,15 +78,21 @@ class QuestClient(val endpoint: Endpoint, private val cache: TemporaryPhotoCache
         require(share.isValid()) { "360°写真の情報が正しくありません" }
         share
     }
-    /** An older phone may not yet offer video sharing. */
-    suspend fun panoramaVideo(): PanoramaVideoShare? = readResponse(request("/v2/panorama/video").build()) { response ->
-        if (response.code == 204 || response.code == 404) return@readResponse null
-        check(response.isSuccessful) { "360°動画の情報を取得できませんでした (${response.code})" }
-        val body = response.body ?: error("応答が空です")
-        require(body.contentLength() in -1..4096)
-        val share = Protocol.json.decodeFromString<PanoramaVideoShare>(readBounded(body.byteStream(), 4096).toString(Charsets.UTF_8))
-        require(share.isValid()) { "360°動画の情報が正しくありません" }
-        share
+    /** v3 distinguishes camera formats; fall back to the legacy stitched-MP4 endpoint. */
+    suspend fun panoramaVideo(): PanoramaVideoShare? {
+        suspend fun fetch(path: String): Pair<Int, PanoramaVideoShare?> = readResponse(request(path).build()) { response ->
+            if (response.code == 204 || response.code == 404) return@readResponse response.code to null
+            check(response.isSuccessful) { "360°動画の情報を取得できませんでした (${response.code})" }
+            val body = response.body ?: error("応答が空です")
+            require(body.contentLength() in -1..4096)
+            val share = Protocol.json.decodeFromString<PanoramaVideoShare>(readBounded(body.byteStream(), 4096).toString(Charsets.UTF_8))
+            require(share.isValid()) { "360°動画の情報が正しくありません" }
+            response.code to share
+        }
+        val (status, share) = fetch("/v3/panorama/video")
+        return if (status == 404) fetch("/v2/panorama/video").second?.also {
+            require(it.format == PanoramaVideoFormat.EQUIRECTANGULAR_MP4)
+        } else share
     }
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     fun panoramaVideoSource(share: PanoramaVideoShare): androidx.media3.exoplayer.source.MediaSource {
@@ -94,7 +100,8 @@ class QuestClient(val endpoint: Endpoint, private val cache: TemporaryPhotoCache
         val authorization = "Bearer ${requireNotNull(token)}"
         val data = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(http)
             .setDefaultRequestProperties(mapOf("Authorization" to authorization))
-        val media = androidx.media3.common.MediaItem.fromUri(endpoint.url + "/v2/panorama/video/${share.id}")
+        val prefix = if (share.format == PanoramaVideoFormat.EQUIRECTANGULAR_MP4) "/v2" else "/v3"
+        val media = androidx.media3.common.MediaItem.fromUri(endpoint.url + "$prefix/panorama/video/${share.id}")
         return androidx.media3.exoplayer.source.ProgressiveMediaSource.Factory(data).createMediaSource(media)
     }
     suspend fun panoramaPhotoBytes(share: PanoramaPhotoShare): ByteArray = panoramaDownloads.withLock {
