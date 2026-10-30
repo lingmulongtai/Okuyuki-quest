@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -40,32 +41,40 @@ fun QuestApp(model: QuestViewModel) {
     var addressError by remember { mutableStateOf(false) }
     var settings by rememberSaveable { mutableStateOf(false) }
     var highResolution by rememberSaveable { mutableStateOf(false) }
-    val theme = darkColorScheme(primary = Color.White, onPrimary = Color(0xFF10131C), background = Color(0xFF090A0F), surface = Color(0xFF232630), onSurface = Color.White, onSurfaceVariant = Color(0xFFB5B6BD))
     BackHandler(state.current != null || state.viewingPanorama || state.viewingVideo) {
         if (state.viewingVideo) model.closeVideo() else if (state.viewingPanorama) model.closePanorama() else model.backToLibrary()
     }
-    MaterialTheme(colorScheme = theme) {
+    OkuyukiTheme(dark = true) {
+        val theme = MaterialTheme.colorScheme
         Surface(Modifier.fillMaxSize(), color = theme.background) {
             Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Okuyuki", style = MaterialTheme.typography.headlineMedium)
-                    Text(if (state.connected) "● ${state.hello?.deviceName}" else "スマホとつなぐ", color = if (state.connected) Color(0xFF6FE0AE) else theme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    if (state.hello != null) TextButton(onClick = { model.disconnect(); model.start() }) { Text("切断") }
-                    TextButton(onClick = { settings = !settings }) { Text(if (settings) "戻る" else "設定") }
+                Surface(shape = RoundedCornerShape(26.dp), color = theme.surfaceVariant.copy(alpha = .5f)) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Text("Okuyuki", style = MaterialTheme.typography.headlineMedium)
+                        Text(if (state.connected) "● ${state.hello?.deviceName}" else "スマホとつなぐ", color = if (state.connected) Color(0xFF9CE1C1) else theme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                        if (state.hello != null) TextButton(onClick = { model.disconnect(); model.start() }) { Text("切断") }
+                        FilledTonalButton(onClick = { settings = !settings }) { Text(if (settings) "戻る" else "設定") }
+                    }
                 }
                 state.error?.let { message ->
                     Row(verticalAlignment = Alignment.CenterVertically) { Text(message, Modifier.weight(1f), color = theme.error); TextButton(onClick = model::reconnect) { Text("再接続") } }
                 }
                 when {
-                    settings -> Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Text("一時保存", style = MaterialTheme.typography.titleLarge)
-                        Text("使用量 ${state.cacheBytes / 1024 / 1024} MB · 上限 1 GB")
-                        Text("写真はQuestに残しません。終了時と次の起動時に一時保存を消します。")
-                        Text("Okuyuki ${BuildConfig.VERSION_NAME}")
-                        UpdateSettings(updater)
-                        Text("立体表示にはMeta VR OS SDK 207以降が必要です。通常Androidでは平面プレビューになります。")
-                        Text("実機検証は未完了です。左右の見え方を確認し、違和感があれば使用を中止してください。")
-                        Text("HEICの読み取りにlibheifとlibde265を使用しています（LGPL）。ライセンスと対応ソースはGitHubのリリースに同梱しています。")
+                    settings -> Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        GlassPanel(Modifier.fillMaxWidth()) {
+                            Text("Okuyuki ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleLarge)
+                            UpdateSettings(updater)
+                        }
+                        GlassPanel(Modifier.fillMaxWidth()) {
+                            Text("一時保存", style = MaterialTheme.typography.titleLarge)
+                            Text("使用量 ${state.cacheBytes / 1024 / 1024} MB · 上限 1 GB")
+                            Text("写真はQuestに残しません。終了時と次の起動時に一時保存を消します。", color = theme.onSurfaceVariant)
+                        }
+                        GlassPanel(Modifier.fillMaxWidth()) {
+                            Text("立体表示にはMeta VR OS SDK 207以降が必要です。通常Androidでは平面プレビューになります。")
+                            Text("実機検証は未完了です。左右の見え方を確認し、違和感があれば使用を中止してください。", color = theme.onSurfaceVariant)
+                            Text("HEICの読み取りにlibheifとlibde265を使用しています（LGPL）。ライセンスと対応ソースはGitHubのリリースに同梱しています。", style = MaterialTheme.typography.bodySmall, color = theme.onSurfaceVariant)
+                        }
                     }
                     state.pairingCode != null -> Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(24.dp)) {
                         Text(state.pairingCode!!, fontSize = 64.sp)
