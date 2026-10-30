@@ -7,12 +7,14 @@ internal data class UpdateRelease(val version: String, val url: String, val dige
 
 /** GitHub's /latest excludes prereleases. Compare versions instead of relying on API order. */
 internal object ReleaseCatalog {
-    private val pattern = Regex("^(\\d+)\\.(\\d+)\\.(\\d+)(?:-alpha\\.(\\d+)(?:-preview)?)?$")
+    private val pattern = Regex("^(\\d+)\\.(\\d+)\\.(\\d+)(?:-(alpha|beta|rc)\\.(\\d+)(?:-preview)?)?$")
     private fun version(value: String): List<Long>? {
         val match = pattern.matchEntire(value.removePrefix("v")) ?: return null
         val parts = match.groupValues
+        val stage = when (parts[4]) { "alpha" -> 0L; "beta" -> 1L; "rc" -> 2L; else -> 3L }
+        val revision = if (parts[4].isEmpty()) 0L else parts[5].toLongOrNull() ?: return null
         return listOf(parts[1].toLongOrNull() ?: return null, parts[2].toLongOrNull() ?: return null,
-            parts[3].toLongOrNull() ?: return null, if (parts[4].isEmpty()) Long.MAX_VALUE else parts[4].toLongOrNull() ?: return null)
+            parts[3].toLongOrNull() ?: return null, stage, revision)
     }
     private fun newer(a: List<Long>, b: List<Long>): Boolean {
         for (i in a.indices) if (a[i] != b[i]) return a[i] > b[i]
@@ -20,16 +22,19 @@ internal object ReleaseCatalog {
     }
     /** The public Atom feed remains available when the unauthenticated REST quota is exhausted. */
     fun latestFeedTag(feed: String, current: String, repo: String): String? {
-        require(feed.contains("<feed ") && feed.contains("<id>tag:github.com,2008:https://github.com/lingmulongtai/Okuyuki-$repo/releases</id>"))
+        require(feed.contains("<feed ") && feed.contains("</feed>") && feed.contains("<id>tag:github.com,2008:https://github.com/lingmulongtai/Okuyuki-$repo/releases</id>"))
         var best = version(current) ?: return null
         var result: String? = null
         val prefix = Regex.escape("https://github.com/lingmulongtai/Okuyuki-$repo/releases/tag/")
         val link = Regex("<link\\s+[^>]*href=\"" + prefix + "(v[0-9A-Za-z.\\-]+)\"[^>]*/?>")
+        var matchedLink = false
         for (match in link.findAll(feed)) {
+            matchedLink = true
             val tag = match.groupValues[1]
             val candidate = version(tag) ?: continue
             if (newer(candidate, best)) { best = candidate; result = tag }
         }
+        require(!feed.contains("<entry>") || matchedLink)
         return result
     }
 
