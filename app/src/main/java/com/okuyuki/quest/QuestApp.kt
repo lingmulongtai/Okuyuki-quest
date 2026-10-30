@@ -52,10 +52,15 @@ fun QuestApp(model: QuestViewModel) {
                 Surface(shape = RoundedCornerShape(26.dp), color = theme.surfaceVariant.copy(alpha = .5f)) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Text("Okuyuki", style = MaterialTheme.typography.headlineMedium)
-                        Text(if (state.connected) "● ${state.hello?.deviceName}" else "スマホとつなぐ", color = if (state.connected) Color(0xFF9CE1C1) else theme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                        if (state.hello != null) TextButton(onClick = { model.disconnect(); model.start() }) { Text("切断") }
+                        Text(if (state.connected) "● ${state.hello?.deviceName}" else if (state.reconnecting) "● つなぎ直しています…" else "スマホとつなぐ",
+                            color = if (state.connected) Color(0xFF9CE1C1) else if (state.reconnecting) theme.primary else theme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                        if (state.hello != null) TextButton(onClick = model::disconnect) { Text("切断") }
                         FilledTonalButton(onClick = { settings = !settings }) { Text(if (settings) "戻る" else "設定") }
                     }
+                }
+                if (state.reconnecting) Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("スマホとの接続が切れました。自動でつなぎ直しています…", Modifier.weight(1f), color = theme.onSurfaceVariant)
+                    TextButton(onClick = model::reconnect) { Text("今すぐ再接続") }
                 }
                 state.error?.let { message ->
                     Row(verticalAlignment = Alignment.CenterVertically) { Text(message, Modifier.weight(1f), color = theme.error); TextButton(onClick = model::reconnect) { Text("再接続") } }
@@ -80,7 +85,7 @@ fun QuestApp(model: QuestViewModel) {
                     state.pairingCode != null -> Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(24.dp)) {
                         Text(state.pairingCode!!, fontSize = 64.sp)
                         Text(state.message)
-                        OutlinedButton(onClick = { model.disconnect(); model.start() }) { Text("キャンセル") }
+                        OutlinedButton(onClick = model::disconnect) { Text("キャンセル") }
                     }
                     state.viewingVideo -> BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                         val previewHeight = (maxHeight * .55f).coerceAtLeast(120.dp).coerceAtMost(maxHeight * .7f)
@@ -145,7 +150,7 @@ fun QuestApp(model: QuestViewModel) {
                         state.panoramaBytes?.let { QuestPanoramaPhoto(it, Modifier.weight(1f).fillMaxWidth()) }
                     }
                     state.current != null -> Viewer(model, state)
-                    state.connected -> {
+                    state.connected || state.reconnecting -> {
                         if (state.sharedVideo != null) {
                             OutlinedButton(onClick = model::openVideo, modifier = Modifier.fillMaxWidth()) { Text("スマホで共有中の360°動画を開く") }
                         }
@@ -154,7 +159,7 @@ fun QuestApp(model: QuestViewModel) {
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("スマホの3D写真 · ${state.hello?.photoCount ?: state.photos.size}枚", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                            TextButton(onClick = model::refresh) { Text("更新") }
+                            TextButton(onClick = model::refresh, enabled = state.connected) { Text("更新") }
                         }
                         if (state.photos.isEmpty()) Text("3D写真が見つかりません。スマホ側で写真のアクセス許可とギャラリーを確認してください。")
                         LazyVerticalGrid(columns = GridCells.Adaptive(180.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
