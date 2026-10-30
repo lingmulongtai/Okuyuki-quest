@@ -186,9 +186,10 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
             catch (_: NotAllowedException) { connection.close(); return removed(hostId) }
             catch (_: Exception) { connection.close() }
         }
-        reconnectingHost = null
+        // Back to the phone list, which says to turn on waiting; the phone is still taken back when it shows up again.
         resumeTried.clear()
-        _state.update { it.copy(reconnecting = false, error = "スマホとの接続が切れました。スマホのOkuyukiで待機がオンか確かめて、再接続してください") }
+        toPhoneList()
+        _state.update { it.copy(error = "スマホとの接続が切れ、自動ではつなぎ直せませんでした") }
     }
     /** The phone removed this Quest: forget its permission and go back to the phone list, saying so. */
     private fun removed(hostId: String) {
