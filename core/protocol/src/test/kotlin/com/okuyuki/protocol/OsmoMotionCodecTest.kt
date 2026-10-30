@@ -26,6 +26,19 @@ class OsmoMotionCodecTest {
         assertThrows(IllegalStateException::class.java) { builder.add(1, 0f, 0f, 0f, 1f) }
         assertEquals(OsmoMotionFrame(0, listOf(0f, 0f, 0f, 1f)), frames[0])
     }
+    @Test fun `long tracks round trip beyond the previous frame limit`() {
+        val count = 180_001
+        val builder = PackedMotionFrames.Builder(count)
+        repeat(count) { builder.add(it * 20_000L, 0f, 0f, 0f, 1f) }
+        val original = OsmoMotionTrack(builder.build(), 20_000)
+        val decoded = OsmoMotionCodec.decode(OsmoMotionCodec.encode(original))
+        assertEquals(count, decoded.frames.size)
+        assertEquals(original.frames.last(), decoded.frames.last())
+        val smooth = OsmoStabilization(decoded)
+        assertArrayEquals(floatArrayOf(1f, 0f, 0f, 0f), smooth.correctionAt(50_000L * 20_000), 0.0001f)
+        assertArrayEquals(floatArrayOf(1f, 0f, 0f, 0f), smooth.correctionAt((count - 1L) * 20_000), 0.0001f)
+        assertNull(smooth.correctionAt(count * 20_000L + 10_001L))
+    }
     @Test fun `rejects malformed or oversized motion payloads`() {
         val bytes = OsmoMotionCodec.encode(track())
         assertThrows(Exception::class.java) { OsmoMotionCodec.decode(bytes.copyOf(bytes.size - 1)) }

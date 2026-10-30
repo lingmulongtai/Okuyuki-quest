@@ -10,7 +10,7 @@ data class OsmoMotionTrack(val frames: List<OsmoMotionFrame>, val frameIntervalU
 
 /** Bounded, versioned transport for a single explicitly shared camera motion track. */
 object OsmoMotionCodec {
-    const val MAX_FRAMES = 50_000
+    const val MAX_FRAMES = 500_000
     const val HEADER_BYTES = 16
     const val FRAME_BYTES = 24
     const val MAX_BYTES = HEADER_BYTES + MAX_FRAMES * FRAME_BYTES
