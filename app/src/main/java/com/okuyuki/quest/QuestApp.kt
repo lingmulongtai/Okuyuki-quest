@@ -63,6 +63,12 @@ fun QuestApp(model: QuestViewModel) {
                         Text(state.message)
                         OutlinedButton(onClick = { model.disconnect(); model.start() }) { Text("キャンセル") }
                     }
+                    state.viewingVideo -> {
+                        TextButton(onClick = model::closeVideo) { Text("一覧に戻る") }
+                        Text("360°動画 · ウィンドウ内プレビュー")
+                        val source = remember(state.sharedVideo) { model.videoSource() }
+                        source?.let { QuestPanoramaVideo(it, Modifier.weight(1f).fillMaxWidth()) }
+                    }
                     state.viewingPanorama -> {
                         TextButton(onClick = model::closePanorama) { Text("一覧に戻る") }
                         Text("360°写真 · ウィンドウ内をドラッグして見回します")
@@ -71,6 +77,9 @@ fun QuestApp(model: QuestViewModel) {
                     }
                     state.current != null -> Viewer(model, state)
                     state.connected -> {
+                        if (state.sharedVideo != null) {
+                            OutlinedButton(onClick = model::openVideo, modifier = Modifier.fillMaxWidth()) { Text("スマホで共有中の360°動画を開く") }
+                        }
                         if (state.sharedPanorama != null) {
                             OutlinedButton(onClick = model::openPanorama, modifier = Modifier.fillMaxWidth()) { Text("スマホで共有中の360°写真を開く") }
                         }

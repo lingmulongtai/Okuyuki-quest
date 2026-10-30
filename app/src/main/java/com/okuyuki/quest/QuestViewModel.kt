@@ -20,6 +20,7 @@ data class QuestState(
     val current: Photo? = null, val eyes: StereoPair? = null, val opening: Boolean = false,
     val sharedPanorama: PanoramaPhotoShare? = null, val viewingPanorama: Boolean = false,
     val panoramaBytes: ByteArray? = null, val openingPanorama: Boolean = false,
+    val sharedVideo: PanoramaVideoShare? = null, val viewingVideo: Boolean = false,
     val message: String = "スマホを探しています", val error: String? = null, val cacheBytes: Long = 0,
 )
 
@@ -37,6 +38,7 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
     private var panoramaOpening: Job? = null
     private var panoramaRefresh: Job? = null
     private var panoramaPoll: Job? = null
+    private var videoRefresh: Job? = null
     private var panoramaRefreshRequested = false
     private var lastEndpoint: Endpoint? = null
     private var cleanup: Job? = null
@@ -88,22 +90,23 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         connection.events(session, changed = { viewModelScope.launch { if (client === connection) refresh() } }, failed = {
             viewModelScope.launch {
                 if (client === connection) {
-                    panoramaPoll?.cancel(); panoramaRefresh?.cancel(); panoramaOpening?.cancel()
+                    panoramaPoll?.cancel(); panoramaRefresh?.cancel(); panoramaOpening?.cancel(); videoRefresh?.cancel()
                     panoramaRefreshRequested = false
                     _state.update { it.copy(connected = false, sharedPanorama = null, viewingPanorama = false,
-                        panoramaBytes = null, openingPanorama = false, error = "スマホとの接続が切れました。再接続してください") }
+                        panoramaBytes = null, openingPanorama = false, sharedVideo = null, viewingVideo = false, error = "スマホとの接続が切れました。再接続してください") }
                 }
             }
         })
         panoramaPoll = session.launch {
             while (isActive && client === connection) {
                 refreshPanorama()
+                refreshVideo()
                 delay(5000)
             }
         }
     }
     fun reconnect() { lastEndpoint?.let(::connect) }
-    fun refresh() { if (_state.value.connected) { loadPage(replace = true); refreshPanorama() } }
+    fun refresh() { if (_state.value.connected) { loadPage(replace = true); refreshPanorama(); refreshVideo() } }
     private fun refreshPanorama() {
         if (!_state.value.connected) return
         val connection = client ?: return
@@ -128,12 +131,39 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
             } while (panoramaRefreshRequested && isActive && client === connection && _state.value.connected)
         }
     }
+    private fun refreshVideo() {
+        if (!_state.value.connected || videoRefresh?.isActive == true) return
+        val connection = client ?: return
+        videoRefresh = session.launch {
+            try {
+                val item = connection.panoramaVideo()
+                if (client !== connection || !_state.value.connected) return@launch
+                _state.update { state -> if (state.sharedVideo == item) state else state.copy(sharedVideo = item, viewingVideo = false) }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) {
+                if (client === connection) _state.update { it.copy(sharedVideo = null, viewingVideo = false) }
+            }
+        }
+    }
+    fun openVideo() {
+        if (!_state.value.connected || _state.value.sharedVideo == null) return
+        opening?.cancel(); prefetch?.cancel(); panoramaOpening?.cancel()
+        _state.update { it.copy(current = null, eyes = null, viewingPanorama = false, panoramaBytes = null,
+            openingPanorama = false, viewingVideo = true, error = null) }
+    }
+    fun closeVideo() { _state.update { it.copy(viewingVideo = false) } }
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    fun videoSource(): androidx.media3.exoplayer.source.MediaSource? {
+        val state = _state.value
+        if (!state.connected || !state.viewingVideo) return null
+        return client?.panoramaVideoSource(state.sharedVideo ?: return null)
+    }
     fun openPanorama() {
         if (!_state.value.connected) return
         val connection = client ?: return
         val item = _state.value.sharedPanorama ?: return
         opening?.cancel(); prefetch?.cancel(); panoramaOpening?.cancel()
-        _state.update { it.copy(current = null, eyes = null, viewingPanorama = true, panoramaBytes = null, openingPanorama = true, error = null) }
+        _state.update { it.copy(current = null, eyes = null, viewingVideo = false, viewingPanorama = true, panoramaBytes = null, openingPanorama = true, error = null) }
         panoramaOpening = session.launch {
             try {
                 val bytes = connection.panoramaPhotoBytes(item)
@@ -174,7 +204,7 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         val connection = client ?: return
         val host = _state.value.hello ?: return
         opening?.cancel(); prefetch?.cancel(); panoramaOpening?.cancel()
-        _state.update { it.copy(current = photo, eyes = null, opening = true, error = null, viewingPanorama = false, panoramaBytes = null, openingPanorama = false) }
+        _state.update { it.copy(current = photo, eyes = null, opening = true, viewingVideo = false, error = null, viewingPanorama = false, panoramaBytes = null, openingPanorama = false) }
         opening = session.launch {
             try {
                 val file = connection.original(host.deviceId, photo)
