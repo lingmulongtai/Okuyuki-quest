@@ -21,6 +21,8 @@ data class QuestState(
     val sharedPanorama: PanoramaPhotoShare? = null, val viewingPanorama: Boolean = false,
     val panoramaBytes: ByteArray? = null, val openingPanorama: Boolean = false,
     val sharedVideo: PanoramaVideoShare? = null, val viewingVideo: Boolean = false,
+    val videoMotion: OsmoStabilization? = null, val videoMotionLoading: Boolean = false,
+    val videoStabilizationEnabled: Boolean = false,
     val message: String = "スマホを探しています", val error: String? = null, val cacheBytes: Long = 0,
 )
 
@@ -39,6 +41,7 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
     private var panoramaRefresh: Job? = null
     private var panoramaPoll: Job? = null
     private var videoRefresh: Job? = null
+    private var videoMotionJob: Job? = null
     private var videoRefreshRequested = false
     private var panoramaRefreshRequested = false
     private var lastEndpoint: Endpoint? = null
@@ -91,10 +94,11 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         connection.events(session, changed = { viewModelScope.launch { if (client === connection) refresh() } }, failed = {
             viewModelScope.launch {
                 if (client === connection) {
-                    panoramaPoll?.cancel(); panoramaRefresh?.cancel(); panoramaOpening?.cancel(); videoRefresh?.cancel()
+                    panoramaPoll?.cancel(); panoramaRefresh?.cancel(); panoramaOpening?.cancel(); videoRefresh?.cancel(); videoMotionJob?.cancel()
                     panoramaRefreshRequested = false; videoRefreshRequested = false
                     _state.update { it.copy(connected = false, sharedPanorama = null, viewingPanorama = false,
-                        panoramaBytes = null, openingPanorama = false, sharedVideo = null, viewingVideo = false, error = "スマホとの接続が切れました。再接続してください") }
+                        panoramaBytes = null, openingPanorama = false, sharedVideo = null, viewingVideo = false,
+                        videoMotion = null, videoMotionLoading = false, videoStabilizationEnabled = false, error = "スマホとの接続が切れました。再接続してください") }
                 }
             }
         })
@@ -143,20 +147,53 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
                     val item = connection.panoramaVideo()
                     if (client !== connection || !_state.value.connected) return@launch
                     if (!videoRefreshRequested) {
-                        _state.update { state -> if (state.sharedVideo == item) state else state.copy(sharedVideo = item, viewingVideo = false) }
+                        if (_state.value.sharedVideo != item) videoMotionJob?.cancel()
+                        _state.update { state -> if (state.sharedVideo == item) state else state.copy(
+                            sharedVideo = item, viewingVideo = false, videoMotion = null,
+                            videoMotionLoading = false, videoStabilizationEnabled = false) }
                     }
                 } catch (cancelled: CancellationException) { throw cancelled }
                 catch (_: Exception) {
-                    if (client === connection) _state.update { it.copy(sharedVideo = null, viewingVideo = false) }
+                    if (client === connection) {
+                        videoMotionJob?.cancel()
+                        _state.update { it.copy(sharedVideo = null, viewingVideo = false, videoMotion = null,
+                            videoMotionLoading = false, videoStabilizationEnabled = false) }
+                    }
                 }
             } while (videoRefreshRequested && isActive && client === connection && _state.value.connected)
         }
     }
     fun openVideo() {
-        if (!_state.value.connected || _state.value.sharedVideo == null) return
-        opening?.cancel(); prefetch?.cancel(); panoramaOpening?.cancel()
+        val state = _state.value
+        val share = state.sharedVideo ?: return
+        val connection = client ?: return
+        if (!state.connected) return
+        opening?.cancel(); prefetch?.cancel(); panoramaOpening?.cancel(); videoMotionJob?.cancel()
+        val raw = share.format != PanoramaVideoFormat.EQUIRECTANGULAR_MP4
         _state.update { it.copy(current = null, eyes = null, viewingPanorama = false, panoramaBytes = null,
-            openingPanorama = false, viewingVideo = true, error = null) }
+            openingPanorama = false, viewingVideo = true, videoMotion = null,
+            videoMotionLoading = raw, videoStabilizationEnabled = false, error = null) }
+        if (!raw) return
+        videoMotionJob = session.launch {
+            try {
+                val track = withTimeoutOrNull(12000) { connection.panoramaVideoMotion(share) }
+                val correction = track?.let { withContext(Dispatchers.Default) { OsmoStabilization(it) } }
+                if (client !== connection) return@launch
+                _state.update { current ->
+                    if (!current.connected || !current.viewingVideo || current.sharedVideo != share) current
+                    else current.copy(videoMotion = correction, videoMotionLoading = false)
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) {
+                if (client === connection) _state.update { current ->
+                    if (!current.connected || !current.viewingVideo || current.sharedVideo != share) current
+                    else current.copy(videoMotion = null, videoMotionLoading = false)
+                }
+            }
+        }
+    }
+    fun setVideoStabilization(enabled: Boolean) {
+        _state.update { state -> state.copy(videoStabilizationEnabled = enabled && state.videoMotion != null && state.viewingVideo) }
     }
     fun prepareImmersiveVideo(): Boolean {
         val current = _state.value
@@ -168,7 +205,10 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         ImmersivePlayback.install(ImmersivePlayback.Connection(connection, share))
         return true
     }
-    fun closeVideo() { _state.update { it.copy(viewingVideo = false) } }
+    fun closeVideo() {
+        videoMotionJob?.cancel()
+        _state.update { it.copy(viewingVideo = false, videoMotion = null, videoMotionLoading = false, videoStabilizationEnabled = false) }
+    }
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     fun videoSource(): androidx.media3.exoplayer.source.MediaSource? {
         val state = _state.value

@@ -73,7 +73,11 @@ fun QuestApp(model: QuestViewModel) {
                         TextButton(onClick = model::closeVideo) { Text("一覧に戻る") }
                         Text("360°動画 · ウィンドウ内プレビュー")
                         val share = state.sharedVideo
-                        if (share != null) {
+                        if (state.videoMotionLoading) {
+                            LinearProgressIndicator(Modifier.fillMaxWidth())
+                            Text("スマホから姿勢情報を確認しています…")
+                        }
+                        if (share != null && !state.videoMotionLoading) {
                             OutlinedButton(onClick = {
                                 if (model.prepareImmersiveVideo()) {
                                     try {
@@ -90,7 +94,7 @@ fun QuestApp(model: QuestViewModel) {
                             }) { Text("没入表示を試す（実験的）") }
                         }
                         val sources = remember(share) { listOfNotNull(model.videoSource(), model.videoSource()) }
-                        if (sources.size == 2) when (share?.format) {
+                        if (!state.videoMotionLoading && sources.size == 2) when (share?.format) {
                             PanoramaVideoFormat.OSMO_LRF -> QuestOsmoProxy(sources[0], share.calibration, Modifier.weight(1f).fillMaxWidth())
                             PanoramaVideoFormat.OSMO_OSV -> QuestOsmoVideo(sources, share.calibration, Modifier.weight(1f).fillMaxWidth())
                             else -> QuestPanoramaVideo(sources[0], Modifier.weight(1f).fillMaxWidth())
