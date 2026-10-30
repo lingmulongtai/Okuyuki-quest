@@ -23,6 +23,17 @@ class ProtocolTest {
         assertFalse(video.copy(sizeBytes = 0).isValid())
         assertFalse(video.copy(sizeBytes = Protocol.MAX_PANORAMA_VIDEO_BYTES + 1).isValid())
     }
+    @Test fun `video format is explicit and old metadata remains readable`() {
+        val old = Protocol.json.decodeFromString<PanoramaVideoShare>("""{"id":"0123456789abcdef0123456789abcdef","sizeBytes":10}""")
+        assertEquals(PanoramaVideoFormat.EQUIRECTANGULAR_MP4, old.format)
+        for (format in PanoramaVideoFormat.entries) {
+            val share = old.copy(format = format)
+            assertEquals(share, Protocol.json.decodeFromString<PanoramaVideoShare>(Protocol.json.encodeToString(share)))
+        }
+        assertThrows(Exception::class.java) {
+            Protocol.json.decodeFromString<PanoramaVideoShare>("""{"id":"0123456789abcdef0123456789abcdef","sizeBytes":10,"format":"UNRECOGNIZED"}""")
+        }
+    }
     @Test fun `resume and suffix ranges are bounded to the source`() {
         assertEquals(ByteRange(4, 9), ByteRange.parse("bytes=4-", 10))
         assertEquals(ByteRange(8, 9), ByteRange.parse("bytes=-2", 10))

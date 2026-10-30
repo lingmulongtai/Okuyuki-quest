@@ -41,9 +41,13 @@ data class PanoramaPhotoShare(val id: String, val sizeBytes: Long) {
     fun isValid(): Boolean = id.matches(Regex("[0-9a-f]{32}")) && sizeBytes in 1..Protocol.MAX_PANORAMA_PHOTO_BYTES
 }
 
-/** An explicitly shared, already-stitched equirectangular MP4 video. */
+/** Distinguish stitched MP4 from the camera's two raw projections. */
 @Serializable
-data class PanoramaVideoShare(val id: String, val sizeBytes: Long) {
+enum class PanoramaVideoFormat { EQUIRECTANGULAR_MP4, OSMO_LRF, OSMO_OSV }
+
+/** A single explicitly shared panoramic video. */
+@Serializable
+data class PanoramaVideoShare(val id: String, val sizeBytes: Long, val format: PanoramaVideoFormat = PanoramaVideoFormat.EQUIRECTANGULAR_MP4) {
     fun isValid(): Boolean = id.matches(Regex("[0-9a-f]{32}")) && sizeBytes in 1..Protocol.MAX_PANORAMA_VIDEO_BYTES
 }
 
