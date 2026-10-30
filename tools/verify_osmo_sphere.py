@@ -25,8 +25,13 @@ for proxy in (0,1):
     if calibrated:
       for side,sign in [('left',-1),('right',1)]:
         p[side+'Intrinsics'].value=(.27,.27,.5,.5);p[side+'Distortion'].value=(0.,0.,0.,0.);p[side+'K5'].value=0.;p[side+'Quaternion'].value=(2**-.5,sign*2**-.5,0.,0.)
+    p['motion'].value=(1.,0.,0.,0.)
     vao.render(mode=moderngl.TRIANGLE_STRIP)
     out=np.frombuffer(target.read(components=3,alignment=1),dtype=np.uint8).reshape(180,360,3)
     assert tuple(out[90,180])==(255,0,0),(proxy,calibrated,'front',out[90,180])
     assert tuple(out[90,0])==(0,255,0),(proxy,calibrated,'back',out[90,0])
-print('sphere shaders: proxy and two-track front/back, calibrated and fallback: OK')
+    p['motion'].value=(0.,0.,0.,1.)
+    vao.render(mode=moderngl.TRIANGLE_STRIP)
+    rotated=np.frombuffer(target.read(components=3,alignment=1),dtype=np.uint8).reshape(180,360,3)
+    assert tuple(rotated[90,180])==(0,255,0),(proxy,calibrated,'rotated',rotated[90,180])
+print('sphere shaders: proxy and two-track front/back, calibration and motion: OK')

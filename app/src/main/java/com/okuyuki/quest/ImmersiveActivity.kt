@@ -70,10 +70,12 @@ class ImmersiveActivity : AppSystemActivity() {
             return
         }
         rawSurface = surface
-        rawPlayback = OsmoImmersivePlayback(this, session, surface, scope) {
+        rawPlayback = OsmoImmersivePlayback(this, session, surface, scope, onError = {
             Toast.makeText(this, "没入再生を開始できませんでした。通常プレビューをお試しください。", Toast.LENGTH_LONG).show()
             finish()
-        }.also { it.setFocused(focused) }
+        }, onStabilizationUnavailable = {
+            Toast.makeText(this, "映像と姿勢の時刻を照合できないため、手ぶれ補正をオフにしました。", Toast.LENGTH_LONG).show()
+        }).also { it.setFocused(focused) }
     }
     private suspend fun verifyShare(session: ImmersivePlayback.Connection) {
         try {

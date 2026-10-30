@@ -213,9 +213,10 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         val share = current.sharedVideo ?: return false
         val existing = client ?: return false
         val token = existing.token ?: return false
-        if (!current.connected || !current.viewingVideo) return false
+        if (!current.connected || !current.viewingVideo || current.videoMotionLoading) return false
         val connection = QuestClient(existing.endpoint, cache).apply { this.token = token }
-        ImmersivePlayback.install(ImmersivePlayback.Connection(connection, share))
+        val stabilization = current.videoMotion.takeIf { current.videoStabilizationEnabled }
+        ImmersivePlayback.install(ImmersivePlayback.Connection(connection, share, stabilization))
         return true
     }
     fun closeVideo() {

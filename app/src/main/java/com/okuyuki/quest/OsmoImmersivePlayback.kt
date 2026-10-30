@@ -10,6 +10,8 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.video.VideoFrameMetadataListener
+import com.okuyuki.protocol.FrameTimestampMap
 import com.okuyuki.protocol.PanoramaVideoFormat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -26,6 +28,7 @@ internal class OsmoImmersivePlayback(
     output: Surface,
     private val scope: CoroutineScope,
     private val onError: () -> Unit,
+    private val onStabilizationUnavailable: () -> Unit,
 ) {
     private val proxy = session.share.format == PanoramaVideoFormat.OSMO_LRF
     private val count = if (proxy) 1 else 2
@@ -36,7 +39,12 @@ internal class OsmoImmersivePlayback(
     private val expected = arrayOfNulls<TrackGroup>(count)
     private val indices = IntArray(count)
     private var syncJob: Job? = null
-    private val renderer = OsmoSphericalRenderer(output, proxy, session.share.calibration, ::prepare, ::fail)
+    private val timestamps = Array(count) { FrameTimestampMap() }
+    private val metadataListeners = List(count) { index -> VideoFrameMetadataListener { pts, releaseNs, _, _ ->
+        timestamps[index].record(releaseNs, pts)
+    } }
+    private val renderer = OsmoSphericalRenderer(output, proxy, session.share.calibration,
+        if (proxy) session.stabilization else null, timestamps[0], ::prepare, ::fail, onStabilizationUnavailable)
 
     private fun prepare(surfaces: List<Surface>) {
         if (closed) return
@@ -79,6 +87,7 @@ internal class OsmoImmersivePlayback(
                     selected[index] = player.currentTracks.groups.any { it.mediaTrackGroup == group && it.isTrackSelected(item.index) }
                 }
             })
+            if (proxy && session.stabilization != null) player.setVideoFrameMetadataListener(metadataListeners[index])
             player.setVideoSurface(surfaces[index])
             player.setMediaSource(session.client.panoramaVideoSource(session.share))
         }
@@ -105,7 +114,10 @@ internal class OsmoImmersivePlayback(
     fun close() {
         if (closed) return
         closed = true; syncJob?.cancel()
-        players.forEach { it.clearVideoSurface(); it.release() }; players.clear()
+        players.forEachIndexed { index, player ->
+            if (proxy && session.stabilization != null) player.clearVideoFrameMetadataListener(metadataListeners[index])
+            player.clearVideoSurface(); player.release()
+        }; players.clear()
         renderer.close()
     }
 }

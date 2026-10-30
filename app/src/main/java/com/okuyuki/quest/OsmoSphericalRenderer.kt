@@ -12,6 +12,9 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
 import android.view.Surface
+import com.okuyuki.protocol.FrameCorrectionMatcher
+import com.okuyuki.protocol.FrameTimestampMap
+import com.okuyuki.protocol.OsmoStabilization
 import com.okuyuki.protocol.PanoramaLensCalibration
 import com.okuyuki.protocol.PanoramaStereoCalibration
 import java.nio.ByteBuffer
@@ -28,8 +31,11 @@ internal class OsmoSphericalRenderer(
     private val output: Surface,
     private val proxy: Boolean,
     private val calibration: PanoramaStereoCalibration?,
+    private val stabilization: OsmoStabilization?,
+    private val timestamps: FrameTimestampMap,
     private val onReady: (List<Surface>) -> Unit,
     private val onError: () -> Unit,
+    private val onStabilizationUnavailable: () -> Unit,
 ) {
     private val main = Handler(Looper.getMainLooper())
     private val thread = HandlerThread("Osmo sphere GPU").apply { start() }
@@ -47,6 +53,8 @@ internal class OsmoSphericalRenderer(
     private val pending = BooleanArray(2)
     private val received = BooleanArray(2)
     private var visible = false
+    private var stabilizationEnabled = stabilization != null
+    private val frameMatcher = stabilization?.let { FrameCorrectionMatcher(timestamps, it) }
     private val count = if (proxy) 1 else 2
     private val quad = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().apply {
         put(floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f)); position(0)
@@ -113,6 +121,13 @@ internal class OsmoSphericalRenderer(
             val position = GLES20.glGetAttribLocation(program, "position")
             GLES20.glEnableVertexAttribArray(position)
             GLES20.glVertexAttribPointer(position, 2, GLES20.GL_FLOAT, false, 0, quad)
+            val matched = if (proxy) frameMatcher?.frame(requireNotNull(textures[0]).timestamp) else null
+            if (stabilizationEnabled && matched?.waiting != true && matched?.correction == null) {
+                stabilizationEnabled = false
+                main.post { if (!closed && !failed) onStabilizationUnavailable() }
+            }
+            val correction = if (stabilizationEnabled) matched?.correction else null
+            GLES20.glUniform4fv(GLES20.glGetUniformLocation(program, "motion"), 1, correction ?: floatArrayOf(1f, 0f, 0f, 0f), 0)
             GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "proxy"), if (proxy) 1f else 0f)
             GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "calibrated"), if (calibration == null) 0f else 1f)
             fun setLens(prefix: String, lens: PanoramaLensCalibration) {
@@ -172,6 +187,7 @@ internal class OsmoSphericalRenderer(
             uniform mat4 texMatrix1;
             uniform float proxy;
             uniform float calibrated;
+            uniform vec4 motion;
             uniform vec4 leftIntrinsics, rightIntrinsics;
             uniform vec4 leftDistortion, rightDistortion;
             uniform float leftK5, rightK5;
@@ -183,13 +199,15 @@ internal class OsmoSphericalRenderer(
                 float longitude = screen.x * 3.14159265359;
                 float latitude = screen.y * 1.57079632679;
                 vec3 ray = vec3(sin(longitude) * cos(latitude), sin(latitude), cos(longitude) * cos(latitude));
-                bool back = ray.z < 0.0;
+                vec3 body = rotateQuaternion(motion, vec3(-ray.x, -ray.z, ray.y));
+                ray = vec3(-body.x, body.z, -body.y);
+                bool back = body.y > 0.0;
                 if (calibrated > 0.5) {
                     vec4 intr = back ? rightIntrinsics : leftIntrinsics;
                     vec4 k = back ? rightDistortion : leftDistortion;
                     float k5 = back ? rightK5 : leftK5;
                     vec4 q = back ? rightQuaternion : leftQuaternion;
-                    vec3 lens = rotateQuaternion(q, vec3(-ray.x, -ray.z, ray.y));
+                    vec3 lens = rotateQuaternion(q, body);
                     float xy = length(lens.xy);
                     float theta = atan(xy, lens.z);
                     float t2 = theta * theta;
