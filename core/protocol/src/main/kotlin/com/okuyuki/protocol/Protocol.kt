@@ -5,8 +5,13 @@ import kotlinx.serialization.json.Json
 
 object Protocol {
     const val VERSION = 1
+    /** Versions the phone speaks: 1 for Quest, 2 for TVs. */
+    val VERSIONS = listOf(1, 2)
     const val SERVICE_TYPE = "_okuyuki._tcp."
+    /** The port the phone tries first, so a TV can come back to the address it saved. */
+    const val PORT = 38765
     const val PAGE_SIZE = 48
+    const val TV_PAGE_SIZE = 60
     const val MAX_ORIGINAL_BYTES = 256L * 1024 * 1024
     const val MAX_PANORAMA_PHOTO_BYTES = 64L * 1024 * 1024
     const val MAX_PANORAMA_VIDEO_BYTES = 256L * 1024 * 1024 * 1024
@@ -20,6 +25,7 @@ data class Hello(
     val appVersion: String,
     val photoCount: Int,
     val protocolVersion: Int = Protocol.VERSION,
+    val protocolVersions: List<Int> = listOf(Protocol.VERSION),
 )
 
 @Serializable
@@ -76,8 +82,14 @@ data class PanoramaVideoShare(
         (calibration == null || (format != PanoramaVideoFormat.EQUIRECTANGULAR_MP4 && calibration.isValid()))
 }
 
+/** [clientKind] is `headset` (Quest, the default) or `tv`. */
 @Serializable
-data class PairRequest(val clientId: String, val clientName: String, val requestId: String? = null)
+data class PairRequest(
+    val clientId: String,
+    val clientName: String,
+    val requestId: String? = null,
+    val clientKind: String = "headset",
+)
 
 @Serializable
 data class PairResponse(
@@ -90,8 +102,69 @@ data class PairResponse(
 @Serializable
 data class ApiError(val message: String)
 
+/** WebSocket event. [target] and [state] belong to v2 `prepared` events. */
 @Serializable
-data class Event(val type: String, val itemId: String? = null)
+data class Event(
+    val type: String,
+    val itemId: String? = null,
+    val target: String? = null,
+    val state: String? = null,
+)
+
+// Protocol v2, used by the TV app. Images, videos and the event socket cannot send an
+// Authorization header from a TV browser, so a token buys a media key that goes in the URL.
+
+@Serializable
+data class MediaKey(val key: String, val expiresAt: Long)
+
+@Serializable
+data class Screen(val graphicsWidth: Int, val graphicsHeight: Int, val videoWidth: Int, val videoHeight: Int)
+
+/** What the TV can show; [video] uses names such as `hevc-main10` and `h264-high`. */
+@Serializable
+data class Capabilities(
+    val screen: Screen? = null,
+    val video: List<String> = emptyList(),
+    val hdr: List<String> = emptyList(),
+    val image: List<String> = emptyList(),
+    val model: String? = null,
+    val platformVersion: String? = null,
+)
+
+/** A photo or video. [kind] is `photo` or `video`; [hdr] is `none`, `ultrahdr`, `hdr10`, `hlg` or `hdr10plus`. */
+@Serializable
+data class Item(
+    val id: String,
+    val kind: String,
+    val name: String,
+    val takenAt: Long,
+    val width: Int,
+    val height: Int,
+    val sizeBytes: Long,
+    val mime: String,
+    val durationMs: Long? = null,
+    val stereo: Boolean = false,
+    val hdr: String = "none",
+)
+
+@Serializable
+data class ItemPage(val items: List<Item>, val next: String? = null, val total: Int)
+
+/**
+ * A 4K still or a playable video. [state] is `ready`, `preparing`, `unsupported` or `failed`;
+ * [url], the size, [mime] and [codecs] are set once it is `ready`.
+ */
+@Serializable
+data class Prepared(
+    val state: String,
+    val url: String? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+    val hdr: String = "none",
+    val mime: String? = null,
+    val codecs: String? = null,
+    val progress: Double? = null,
+)
 
 /** Inclusive HTTP byte interval. Invalid/unsatisfiable and multiple ranges are rejected. */
 data class ByteRange(val first: Long, val last: Long) {
