@@ -1,6 +1,7 @@
 package com.okuyuki.quest.link
 
 import com.okuyuki.protocol.Photo
+import com.okuyuki.protocol.PanoramaPhotoShare
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -12,6 +13,26 @@ import org.junit.rules.TemporaryFolder
 
 class QuestClientTest {
     @get:Rule val folder = TemporaryFolder()
+    @Test fun `panorama photo uses bearer authentication and rejects invalid or truncated data`() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            val share = PanoramaPhotoShare("0123456789abcdef0123456789abcdef", 4)
+            server.enqueue(MockResponse().setResponseCode(404))
+            server.enqueue(MockResponse().setBody("""{"id":"${share.id}","sizeBytes":4}"""))
+            server.enqueue(MockResponse().setBody(Buffer().write(byteArrayOf(1, 2, 3, 4))))
+            server.enqueue(MockResponse().setBody(Buffer().write(byteArrayOf(1, 2, 3))))
+            QuestClient(Endpoint(server.hostName, server.port), TemporaryPhotoCache(folder.newFolder())).use { client ->
+                client.token = "paired-token"
+                assertNull(client.panoramaPhoto())
+                assertEquals(share, client.panoramaPhoto())
+                assertArrayEquals(byteArrayOf(1, 2, 3, 4), client.panoramaPhotoBytes(share))
+                assertTrue(runCatching { client.panoramaPhotoBytes(share) }.isFailure)
+                repeat(4) { assertEquals("Bearer paired-token", server.takeRequest().getHeader("Authorization")) }
+                assertTrue(runCatching { client.panoramaPhotoBytes(share.copy(id = "../1")) }.isFailure)
+                assertEquals(4, server.requestCount)
+            }
+        }
+    }
     @Test fun `download resumes at the exact offset and carries the pairing token`() = runBlocking {
         MockWebServer().use { server ->
             server.start()
