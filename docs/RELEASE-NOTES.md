@@ -1,8 +1,12 @@
-# Okuyuki v0.1.0-alpha.10-preview
+# Okuyuki v0.1.0-alpha.11-preview
 
-GalaxyとQuestの両方に、このプレビュー版をインストールしてください。長尺動画の共有・補正には両方の更新が必要です。対応OS、ダウンロード、更新、ペアリング、360°動画の共有と没入表示の手順は [実機テスト用ガイド](https://github.com/lingmulongtai/Okuyuki-android/blob/v0.1.0-alpha.10-preview/docs/DEVICE-PREVIEW.md) を参照してください。
+GalaxyとQuestの両方に、このプレビュー版をインストールしてください。長尺動画の共有・補正には両方の更新が必要です。対応OS、ダウンロード、更新、ペアリング、360°動画の共有と没入表示の手順は [実機テスト用ガイド](https://github.com/lingmulongtai/Okuyuki-android/blob/v0.1.0-alpha.11-preview/docs/DEVICE-PREVIEW.md) を参照してください。
 
 起動時に更新を自動確認し、APKのハッシュ・署名・パッケージを検証してダウンロードします。インストールはOS上の確認が必要です。alpha.9以前からの更新は一度手動で行ってください。Questでのアプリ内インストールは実機未検証です。
+
+## デザインの更新
+
+LastWave Native の画面を参考に、角丸パネル、濃色を基調とした配色、淡い青灰色の操作部品を採用しました。Androidではライブラリ、Quest接続、設定と浮いたナビゲーションを再構成し、ライト／ダークと日本語／英語に対応します。Questの接続・ライブラリ・設定も同じデザインに統一しました。
 
 ## 試せること
 
